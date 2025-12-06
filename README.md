@@ -1,12 +1,12 @@
-# Gemini Quant: Deep Market Analysis & Trading
+# Gemini Quant: Deep Market Analysis
 
-**Gemini Quant** is a professional-grade financial analysis framework designed to transform AI agents into institutional equity research analysts. It combines deep market research capabilities with a high-performance terminal for execution.
+**Gemini Quant** is a financial analysis tool designed to transform Gemini CLI into institutional equity research analysts. 
 
-![Analysis Preview](https://github.com/lopushok9/gemini_quant/raw/main/preview_analysis.png)
+You can use it for free on Gemini CLI! Just download it from official Gemini repository and install it. No need API keys, payments for tokens or anything else. 
 
 ## 🧠 AI Investor: Deep Market Analysis
 
-The core of this repository is the **AI Investor** engine—a sophisticated research framework (`GEMINI.md`) that directs AI agents to perform comprehensive, multi-layered market analysis. Unlike simple summarizers, this system executes a rigorous due diligence process.
+The core of this repository is the **AI Investor** engine—a  research framework (`GEMINI.md`) that directs Gemini to perform multi-layered market analysis. Unlike simple summarizers, this system executes a rigorous due diligence process.
 
 ### Research Methodology
 The agent follows a strict 3-pillar investigative strategy:
