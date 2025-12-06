@@ -1,0 +1,10 @@
+{
+  "name": "ai-investor",
+  "version": "1.0.0",
+  "mcp": {
+    "command": [
+      "./venv/bin/python",
+      "mcp_server.py"
+    ]
+  }
+}

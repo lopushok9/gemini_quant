@@ -1,0 +1,7 @@
+# Python libraries required for the Hyperliquid Terminal
+
+requests
+textual
+websockets
+aiohttp
+plotext

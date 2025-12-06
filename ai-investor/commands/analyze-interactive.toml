@@ -1,0 +1,13 @@
+# Описание команды "analyze-interactive"
+name = "analyze-interactive"
+description = "Запускает интерактивный чат для анализа акций."
+
+# Определяем аргументы для команды.
+args = [
+  {
+    name = "ticker",
+    description = "Тикер акции или криптовалюты (например, AAPL, BTC).",
+    type = "string",
+    required = true
+  }
+]
