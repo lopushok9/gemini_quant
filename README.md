@@ -1,8 +1,8 @@
 # Gemini Quant: Deep Market Analysis
 
-**Gemini Quant** is a financial analysis tool designed to transform Gemini CLI into an institutional equity research analyst.
+**Gemini Quant** is a financial analysis tool designed to transform Gemini CLI into a research analyst.
 
-You can use it **100% free** with Gemini CLI! No API keys, no token payments, no subscriptions.
+You can use it free with Gemini CLI! No API keys, no token payments, no subscriptions.
 
 ---
 
@@ -49,9 +49,9 @@ Once installed, you can use these commands directly in your terminal:
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/analyze [TICKER]` | **Long-term investment analysis**. Generates a full research report with BUY/SELL/HOLD rating, price targets, risk assessment. | `/analyze AAPL` |
-| `/analyze-st [TICKER]` | **Short-term trading analysis**. Focuses on technical indicators, momentum, and near-term catalysts for swing trading. | `/analyze-st TSLA` |
-| `/analyze-lev [TICKER]` | **Leveraged trading analysis**. Evaluates assets for short-term leveraged positions with specific entry/exit points. | `/analyze-lev BTC` |
+| `gemini analyze [TICKER]` | **Long-term investment analysis**. Generates a full research report with BUY/SELL/HOLD rating, price targets, risk assessment. | `gemini analyze AAPL` |
+| `gemini analyze-st [TICKER]` | **Short-term trading analysis**. Focuses on technical indicators, momentum, and near-term catalysts for swing trading. | `gemini analyze-st TSLA` |
+| `gemini analyze-lev [TICKER]` | **Leveraged trading analysis**. Evaluates assets for short-term leveraged positions with specific entry/exit points. | `gemini analyze-lev BTC` |
 
 
 ---
