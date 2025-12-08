@@ -1,14 +1,9 @@
-# Description for the "analyze-lev" command
+# analyze-lev command (leveraged trading)
 name = "analyze-lev"
 description = "Analyzes a stock or cryptocurrency for short-term leveraged trading."
 
-# Define the arguments for the command.
-# We have one argument: "ticker".
-args = [
-  {
-    name = "ticker",
-    description = "The ticker of the stock or cryptocurrency (e.g., AAPL, BTC).",
-    type = "string",
-    required = true
-  }
-]
+[[args]]
+name = "ticker"
+description = "The ticker of the stock or cryptocurrency (e.g., AAPL, BTC)."
+type = "string"
+required = true

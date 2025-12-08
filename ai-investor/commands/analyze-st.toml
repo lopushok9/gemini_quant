@@ -1,13 +1,9 @@
-# Описание команды "analyze-st"
+# analyze-st command (short-term)
 name = "analyze-st"
-description = "Анализирует краткосрочную торговую стратегию для акций или криптовалют."
+description = "Analyzes a stock or cryptocurrency for short-term trading strategy."
 
-# Определяем аргументы для команды.
-args = [
-  {
-    name = "ticker",
-    description = "Тикер акции или криптовалюты (например, AAPL, BTC).",
-    type = "string",
-    required = true
-  }
-]
+[[args]]
+name = "ticker"
+description = "The ticker of the stock or cryptocurrency (e.g., AAPL, BTC)."
+type = "string"
+required = true

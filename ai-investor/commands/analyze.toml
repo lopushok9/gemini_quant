@@ -1,14 +1,9 @@
-# Описание команды "analyze"
+# analyze command
 name = "analyze"
-description = "Анализирует акции или криптовалюту по тикеру с использованием ИИ."
+description = "Analyzes a stock or cryptocurrency ticker using AI for long-term investment."
 
-# Определяем аргументы для команды.
-# Здесь у нас один аргумент - "ticker".
-args = [
-  {
-    name = "ticker",
-    description = "Тикер акции или криптовалюты (например, AAPL, BTC).",
-    type = "string",
-    required = true
-  }
-]
+[[args]]
+name = "ticker"
+description = "The ticker of the stock or cryptocurrency (e.g., AAPL, BTC)."
+type = "string"
+required = true
