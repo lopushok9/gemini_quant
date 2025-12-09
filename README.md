@@ -45,7 +45,7 @@ You should see `ai-investor` in the list of installed extensions.
 
 ### Available Commands
 
-Once installed, you can use these commands directly in your terminal:
+Once installed, you can use these commands directly in your terminal (run commands from the ai-investor folder):
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -81,15 +81,10 @@ The agent follows a strict 3-pillar investigative strategy:
 
 ---
 
-## Hyperliquid Terminal (Bonus Feature)
+## Hyperliquid Terminal 
 
-Included in this suite is a high-performance **Terminal User Interface (TUI)** for direct trading on Hyperliquid. It provides a distraction-free, keyboard-driven environment for execution.
+Included in this suite is a **Terminal User Interface (TUI)** for monitoring assets on Hyperliquid. It provides a distraction-free, keyboard-driven environment for execution.
 
-### Key Features
-
-*   **Live Market Data**: Real-time candlestick charts (custom rendering), convergent order books, and colored trade feeds.
-*   **Performance**: Optimized for speed (0.3s updates).
-*   **Multi-Asset**: Instant switching between assets (`s` key).
 
 ### Installation & Run
 
