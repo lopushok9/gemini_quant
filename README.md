@@ -1,3 +1,4 @@
+![Gemini Assistant Screenshot](assets/screenshot.png)
 # Gemini Quant: Deep Market Analysis
 
 **Gemini Quant** is a financial analysis tool designed to transform Gemini CLI into a research analyst.
@@ -45,7 +46,7 @@ You should see `ai-investor` in the list of installed extensions.
 
 ### Available Commands
 
-Once installed, you can use these commands directly in your terminal (run commands from the ai-investor folder):
+Once installed, you can use these commands directly in your terminal, it may take a while to load up to 3 minutes (run commands from the ai-investor folder):
 
 | Command | Description | Example |
 |---------|-------------|---------|
