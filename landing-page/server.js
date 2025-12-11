@@ -22,8 +22,10 @@ app.get('/how-to-use', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'how-to-use.html'));
 });
 
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-});
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`Server running at http://localhost:${port}`);
+    });
+}
 
 module.exports = app;
