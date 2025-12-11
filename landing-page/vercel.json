@@ -2,8 +2,20 @@
     "version": 2,
     "rewrites": [
         {
-            "source": "/(.*)",
-            "destination": "/server.js"
+            "source": "/about",
+            "destination": "/about.html"
+        },
+        {
+            "source": "/terms",
+            "destination": "/terms.html"
+        },
+        {
+            "source": "/how-to-use",
+            "destination": "/how-to-use.html"
+        },
+        {
+            "source": "/",
+            "destination": "/index.html"
         }
     ]
 }
