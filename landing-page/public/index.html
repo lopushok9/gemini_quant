@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Ionicons for some icons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <div class="logo">Quanty</div>
+        <div class="nav-links">
+            <a href="/about">About</a>
+            <a href="/terms">Terms</a>
+            <a href="/how-to-use">How to Use</a>
+        </div>
+        <div class="nav-actions">
+            <a href="https://github.com/lopushok9/gemini_quant" class="download-btn">Download</a>
+        </div>
+    </nav>
+
+    <main class="hero-section">
+
+        <section class="quanty-intro">
+            <h1 class="quanty-title">Quanty</h1>
+            <p class="quanty-subtitle">Free, easy-to-use, AI-driven market research tool for the Gemini CLI</p>
+
+            <div class="copy-container">
+                <span class="command-text">git clone https://github.com/lopushok9/gemini_quant.git</span>
+                <button class="copy-btn"
+                    onclick="navigator.clipboard.writeText('git clone https://github.com/lopushok9/gemini_quant.git')">
+                    <ion-icon name="copy-outline"></ion-icon>
+                </button>
+            </div>
+
+        </section>
+
+        <section class="terminal-showcase">
+            <h2 class="section-title">Transform your workflow with <br> <span class="highlight">Intelligence</span></h2>
+
+            <div class="terminal-container">
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <div class="dot red"></div>
+                        <div class="dot yellow"></div>
+                        <div class="dot green"></div>
+                        <div class="terminal-title">user@macbook: ~/projects/quanty</div>
+                    </div>
+                    <div class="terminal-body">
+                        <div class="command-line">
+                            <span class="prompt">?</span> <span class="question">What would you like to do?</span> <span
+                                class="hint"></span>
+                        </div>
+                        <div class="options">
+                            <div class="option active">
+                                <span class="chevron">›</span> <span class="text">Analyze</span>
+                            </div>
+                            <div class="option indent">
+                                <span class="text">Analyze short-term</span>
+                            </div>
+                            <div class="option indent">
+                                <span class="text">Analyze leverage</span>
+                            </div>
+                            <div class="option indent">
+                                <span class="text">Claim research</span>
+                            </div>
+                            <div class="option">
+                                <span class="text" style="color: #4A90E2;">Configure AI Model</span>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="result-success">
+                            <span class="tick">✔</span> Analysis complete
+                        </div>
+                        <div class="result-details">
+                            Bitcoin<br>
+                            <span class="highlight-text">The investment case for Bitcoin is a tale of two
+                                horizons...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features-section">
+            <div class="section-header">
+                <p class="section-label"></p>
+                <h2 class="features-headline">Features</h2>
+            </div>
+
+            <div class="features-grid">
+                <!-- Card 1: Free -->
+                <div class="feature-card">
+                    <div class="icon-box">
+                        <ion-icon name="flash-outline"></ion-icon>
+                    </div>
+                    <h3 class="feature-title">Completely Free</h3>
+                    <p class="feature-desc">
+                        Open source and free to use. No hidden costs or subscriptions. Just clone and start analyzing.
+                    </p>
+                </div>
+
+                <!-- Card 2: Local -->
+                <div class="feature-card">
+                    <div class="icon-box">
+                        <ion-icon name="lock-closed-outline"></ion-icon>
+                    </div>
+                    <h3 class="feature-title">Local</h3>
+                    <p class="feature-desc">
+                        Control all processes by yourself. Setup for your own needs - tune parameters, test your own
+                        scripts.
+                    </p>
+                </div>
+
+                <!-- Card 3: Best Models -->
+                <div class="feature-card">
+                    <div class="icon-box">
+                        <ion-icon name="sparkles-outline"></ion-icon>
+                    </div>
+                    <h3 class="feature-title">Best AI Models</h3>
+                    <p class="feature-desc">
+                        Powered by Google Gemini 3 Pro. Leveraging state-of-the-art reasoning for deep insights.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="cli-section">
+            <div class="cli-content">
+                <div class="cli-text-col">
+                    <span class="cli-badge"> <ion-icon name="terminal-outline"></ion-icon> &nbsp; CLI First</span>
+                    <h2 class="cli-headline">Experience the CLI</h2>
+                    <p class="cli-description">
+                        We provide a CLI-first experience, making it easy to integrate into your workflow. Fast,
+                        independent and efficient.
+                    </p>
+                    <ul class="cli-features-list">
+                        <li><span class="check-icon"><ion-icon name="checkmark-outline"></ion-icon></span> Discover
+                            market opportunities</li>
+                        <li><span class="check-icon"><ion-icon name="checkmark-outline"></ion-icon></span> Receive
+                            insights</li>
+                        <li><span class="check-icon"><ion-icon name="checkmark-outline"></ion-icon></span> Build
+                            conviction</li>
+                    </ul>
+                </div>
+                <div class="cli-visual-col">
+                    <div class="terminal-container">
+                        <div class="terminal-window">
+                            <div class="terminal-header">
+                                <div class="dot red"></div>
+                                <div class="dot yellow"></div>
+                                <div class="dot green"></div>
+                                <div class="terminal-title">user@macbook: ~/quanty</div>
+                            </div>
+                            <div class="terminal-body">
+                                <div class="command-line">
+                                    <span class="prompt">?</span> <span class="question">What would you like to
+                                        know?</span> <span class="hint"></span>
+                                </div>
+                                <div class="options">
+                                    <div class="option">
+                                        <span class="text">Technical Analysis</span>
+                                    </div>
+                                    <div class="option">
+                                        <span class="text">Sentiment Analysis</span>
+                                    </div>
+                                    <div class="option">
+                                        <span class="text">Insider Analysis</span>
+                                    </div>
+                                    <div class="option">
+                                        <span class="text">Tokenomics info</span>
+                                    </div>
+                                    <div class="option active">
+                                        <span class="chevron">›</span> <span class="text"
+                                            style="color: #3B7C75;">Configure AI Model</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="web-version-section">
+            <button class="web-version-btn">Web Version</button>
+            <p class="coming-soon-text">Coming soon</p>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/about">About</a>
+                <a href="/terms">Terms</a>
+                <a href="/how-to-use">How to Use</a>
+            </div>
+            <div class="copyright">
+                &copy; 2025 Quanty. DYOR.
+            </div>
+        </div>
+    </footer>
+
+</body>
+
+</html>

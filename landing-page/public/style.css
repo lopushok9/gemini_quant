@@ -1,0 +1,690 @@
+:root {
+    --font-body: 'DM Sans', sans-serif;
+    --font-heading: 'Playfair Display', serif;
+    /* User requested White, Gray, Blue */
+    --color-bg: #FFFFFF;
+    /* White */
+    --color-text-main: #333333;
+    /* Dark Gray */
+    --color-text-light: #666666;
+    /* Light Gray */
+    --color-accent: #4A90E2;
+    /* Blue */
+    --color-terminal-bg: #FFFFFF;
+    /* White terminal as requested */
+    --color-terminal-text: #333333;
+    --color-terminal-border: #E0E0E0;
+    --color-nav-bg: rgba(255, 255, 255, 0.9);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--color-bg);
+    color: var(--color-text-main);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Typography */
+h1,
+h2,
+h3 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: var(--color-accent);
+}
+
+/* Navigation */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 5%;
+    /* Slightly reduced padding */
+    position: sticky;
+    top: 0;
+    background: var(--color-nav-bg);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+}
+
+.logo {
+    font-weight: 700;
+    font-size: 1.2rem;
+    letter-spacing: -0.5px;
+    width: 120px;
+    /* Fixed width to help centering siblings if needed, or flex basis */
+}
+
+.nav-links {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.nav-links a {
+    margin: 0 1.5rem;
+    font-size: 0.95rem;
+    color: var(--color-text-light);
+    font-weight: 500;
+}
+
+.nav-actions {
+    width: 120px;
+    /* Balance the logo width for true center of links */
+    display: flex;
+    justify-content: flex-end;
+}
+
+.download-btn {
+    background-color: var(--color-accent);
+    color: #FFFFFF;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.download-btn:hover {
+    background-color: #357ABD;
+    /* Darker blue */
+    color: #FFFFFF;
+}
+
+/* ... existing hero/quanty styling ... */
+
+/* CLI Section */
+.cli-section {
+    padding: 6rem 5%;
+    display: flex;
+    justify-content: center;
+}
+
+.cli-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1200px;
+    width: 100%;
+    gap: 4rem;
+}
+
+.cli-text-col {
+    flex: 1;
+    max-width: 500px;
+}
+
+.cli-visual-col {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    /* Center terminal in its column */
+}
+
+.cli-badge {
+    display: inline-flex;
+    align-items: center;
+    background-color: #E0F2FE;
+    /* Light blue pill */
+    color: #0284C7;
+    /* Darker blue text */
+    padding: 6px 16px;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.cli-headline {
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.1;
+    color: #1a1a1a;
+    text-align: left;
+}
+
+.cli-description {
+    font-size: 1.1rem;
+    color: var(--color-text-light);
+    margin-bottom: 2rem;
+    line-height: 1.6;
+    text-align: left;
+}
+
+.cli-features-list {
+    list-style: none;
+    padding: 0;
+}
+
+.cli-features-list li {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    color: #4B5563;
+    font-size: 1rem;
+}
+
+.check-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #D1FAE5;
+    /* Light green circle */
+    color: #059669;
+    /* Green icon */
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    margin-right: 12px;
+    font-size: 16px;
+}
+
+@media (max-width: 900px) {
+    .cli-content {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .cli-text-col {
+        margin-bottom: 3rem;
+        align-items: center;
+        /* If using flex col for badging centering */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .cli-features-list li {
+        justify-content: center;
+        /* Center list items on mobile if text centered */
+    }
+
+    .nav-links {
+        display: none;
+        /* Hide links on mobile for now or burger menu (minimal scope: hide or stack) */
+    }
+}
+
+/* Text Pages */
+.text-page-container {
+    max-width: 800px;
+    margin: 6rem auto;
+    padding: 0 2rem;
+    min-height: 60vh;
+}
+
+.text-page-container h1 {
+    font-size: 3rem;
+    margin-bottom: 2rem;
+    color: #1a1a1a;
+}
+
+.text-page-container h2 {
+    font-size: 1.8rem;
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+    color: #333;
+}
+
+.text-page-container p {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: #4B5563;
+    margin-bottom: 1.5rem;
+}
+
+.code-block {
+    background-color: #F3F4F6;
+    padding: 1.5rem;
+    border-radius: 8px;
+    font-family: 'Menlo', 'Monaco', monospace;
+    font-size: 0.9rem;
+    color: #374151;
+    overflow-x: auto;
+    margin-bottom: 2rem;
+    border: 1px solid #E5E7EB;
+}
+
+/* Web Version Section */
+.web-version-section {
+    padding: 4rem 5% 6rem;
+    text-align: center;
+    background-color: #FDFDFD;
+}
+
+.web-version-btn {
+    background-color: #3B82F6;
+    /* Blue based on Quanty/GitGenius vibe */
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.web-version-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 12px rgba(59, 130, 246, 0.3);
+}
+
+.coming-soon-text {
+    margin-top: 1rem;
+    color: #9CA3AF;
+    font-style: italic;
+    font-size: 0.95rem;
+}
+
+/* Hero Section */
+.hero-section {
+    text-align: center;
+    padding: 0;
+    /* Changed padding to handle children sections */
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Quanty Intro Section (Top) */
+.quanty-intro {
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Center content vertically */
+    width: 100%;
+    max-width: 100%;
+    /* Full width for background */
+    min-height: 100vh;
+    /* Full screen height */
+
+    /* Subtle blue bokeh effect */
+    background:
+        radial-gradient(circle at 20% 20%, rgba(74, 144, 226, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(74, 144, 226, 0.05) 0%, transparent 40%),
+        #FFFFFF;
+}
+
+.quanty-title {
+    font-size: 5rem;
+    /* Big serif title */
+    margin-bottom: 1.5rem;
+    color: #1a1a1a;
+    line-height: 1;
+}
+
+.quanty-subtitle {
+    font-size: 1.25rem;
+    color: var(--color-text-light);
+    margin-bottom: 2.5rem;
+    max-width: 600px;
+    line-height: 1.6;
+}
+
+/* Copy Command Pill */
+.copy-container {
+    display: flex;
+    align-items: center;
+    background-color: #F3F4F6;
+    /* Light gray pill background */
+    padding: 8px 8px 8px 24px;
+    border-radius: 9999px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1rem;
+    max-width: 100%;
+    border: 1px solid #E5E7EB;
+}
+
+.command-text {
+    font-family: 'Menlo', 'Monaco', monospace;
+    font-size: 0.95rem;
+    color: #374151;
+    margin-right: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+    /* Ensure on mobile it truncates safely */
+}
+
+@media (min-width: 600px) {
+    .command-text {
+        max-width: none;
+    }
+}
+
+.copy-btn {
+    background: #FFFFFF;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #6B7280;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.copy-btn:hover {
+    color: var(--color-accent);
+    transform: scale(1.05);
+}
+
+.copy-btn:active {
+    transform: scale(0.95);
+}
+
+.requirements-text {
+    font-size: 0.8rem;
+    color: #9CA3AF;
+    /* Light gray text for requirements */
+    margin-top: 1rem;
+}
+
+/* Terminal Showcase Section (Below) */
+.terminal-showcase {
+    padding: 18rem 1rem 6rem;
+    width: 100%;
+    background: linear-gradient(to bottom, #FFFFFF 0%, #FAFAFA 100%);
+    /* Subtle gradient transition if needed */
+}
+
+.section-title {
+    /* Was hero-title previously */
+    font-size: 3rem;
+    margin-bottom: 3rem;
+    line-height: 1.2;
+    color: #1a1a1a;
+    text-align: center;
+}
+
+.highlight {
+    color: var(--color-accent);
+    /* Use blue for accent if needed, or italic like ref */
+    font-style: italic;
+}
+
+/* Features Section */
+.features-section {
+    width: 100%;
+    padding: 6rem 5% 8rem;
+    background-color: #FAFAFA;
+    /* Slightly off-white to distinguish from white cards/hero if needed, or keep white */
+    text-align: center;
+}
+
+.section-header {
+    margin-bottom: 4rem;
+}
+
+.section-label {
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    color: #9333EA;
+    /* Purple accent like screenshot 'WHY GITGENIUS?' or keeping Blue logic */
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.features-headline {
+    font-size: 3rem;
+    font-family: var(--font-heading);
+    color: #1a1a1a;
+}
+
+/* Features Grid */
+.features-grid {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.feature-card {
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 2rem 2rem;
+    flex: 1;
+    min-width: 300px;
+    max-width: 380px;
+    text-align: left;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+    /* Very subtle shadow */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+}
+
+.icon-box {
+    margin-bottom: 1rem;
+    font-size: 32px;
+    color: #4B5563;
+    /* Dark gray icon */
+    background: #F3F4F6;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+.feature-title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: #1F2937;
+}
+
+.feature-desc {
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: #6B7280;
+    line-height: 1.6;
+}
+
+/* Terminal Component */
+.terminal-container {
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+    perspective: 1000px;
+    /* For 3D effect if we wanted, keeps it flat mostly */
+}
+
+.terminal-window {
+    background-color: var(--color-terminal-bg);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    /* Soft deep shadow + border */
+    overflow: hidden;
+    text-align: left;
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    /* Terminal font */
+}
+
+.terminal-header {
+    background-color: #F8F8F8;
+    /* Light gray header to contrast slightly with white body */
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--color-terminal-border);
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.dot.red {
+    background-color: #FF5F56;
+}
+
+.dot.yellow {
+    background-color: #FFBD2E;
+}
+
+.dot.green {
+    background-color: #27C93F;
+}
+
+.terminal-title {
+    margin-left: 12px;
+    color: #999;
+    font-size: 13px;
+    font-family: var(--font-body);
+    /* Sans serif for UI text */
+}
+
+.terminal-body {
+    padding: 2rem;
+    color: var(--color-terminal-text);
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.command-line {
+    margin-bottom: 1.5rem;
+}
+
+.prompt {
+    color: #D9A534;
+    /* Gold/yellow ish */
+    font-weight: bold;
+}
+
+.question {
+    font-weight: 600;
+}
+
+.hint {
+    color: #999;
+    font-weight: normal;
+    margin-left: 8px;
+}
+
+.options {
+    margin-bottom: 2rem;
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.option.active {
+    color: #3B7C75;
+    /* Teal-ish green for active */
+    font-weight: 600;
+}
+
+.option.indent {
+    margin-left: 20px;
+    color: #888;
+}
+
+.chevron {
+    margin-right: 8px;
+}
+
+.divider {
+    height: 1px;
+    background-color: #eee;
+    margin: 1.5rem 0;
+}
+
+.result-success {
+    color: #3B7C75;
+    /* Green */
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.result-details {
+    color: #666;
+}
+
+.highlight-text {
+    color: #D9A534;
+    /* Gold/yellow ish */
+}
+
+
+/* Footer */
+.site-footer {
+    padding: 3rem 5%;
+    border-top: 1px solid #f0f0f0;
+    margin-top: auto;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.footer-links a {
+    margin-right: 2rem;
+    color: var(--color-text-light);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.copyright {
+    color: #999;
+    font-size: 0.85rem;
+}
+
+/* Responsiveness */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2rem;
+    }
+
+    .terminal-container {
+        padding: 0 1rem;
+    }
+
+    .footer-content {
+        flex-direction: column;
+        gap: 1.5rem;
+        text-align: center;
+    }
+
+    .footer-links a {
+        margin: 0 1rem;
+    }
+}
