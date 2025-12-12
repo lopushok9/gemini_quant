@@ -6,6 +6,7 @@ import ssl
 import certifi
 from typing import Dict, Any, Optional
 from config import HYPERLIQUID_API_URL, DEFAULT_ASSET
+import time
 
 class HyperliquidAPI:
     def __init__(self):
@@ -16,28 +17,65 @@ class HyperliquidAPI:
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def _ensure_session(self):
+        """Ensure we have an active session with proper timeout and keepalive settings."""
         if self.session is None or self.session.closed:
             ssl_context = ssl.create_default_context(cafile=certifi.where())
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
-            self.session = aiohttp.ClientSession(connector=connector)
+            # Configure connector with timeout and keepalive
+            connector = aiohttp.TCPConnector(
+                ssl=ssl_context,
+                ttl_dns_cache=300,
+                keepalive_timeout=30,
+                force_close=False
+            )
+            # Set timeout for all requests: 10s connect, 30s total
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            self.session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=timeout
+            )
 
     async def close(self):
+        """Properly close the session."""
         if self.session and not self.session.closed:
             await self.session.close()
+            # Give time for cleanup to prevent warnings
+            await asyncio.sleep(0.25)
 
-    async def _make_request(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Helper to make POST requests to the Hyperliquid API."""
+    async def _make_request(self, endpoint: str, payload: Dict[str, Any], max_retries: int = 3) -> Dict[str, Any]:
+        """Helper to make POST requests to the Hyperliquid API with retry logic."""
         await self._ensure_session()
-        try:
-            headers = {"Content-Type": "application/json"}
-            async with self.session.post(self.base_url + endpoint, headers=headers, json=payload) as response:
-                response.raise_for_status()
-                data = await response.json()
-                return {"success": True, "data": data}
-        except aiohttp.ClientError as e:
-            return {"success": False, "error": str(e)}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                headers = {"Content-Type": "application/json"}
+                # Set per-request timeout of 10 seconds
+                timeout = aiohttp.ClientTimeout(total=10)
+                async with self.session.post(
+                    self.base_url + endpoint,
+                    headers=headers,
+                    json=payload,
+                    timeout=timeout
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    return {"success": True, "data": data}
+                    
+            except asyncio.TimeoutError as e:
+                last_error = f"Timeout: {str(e)}"
+            except aiohttp.ClientError as e:
+                last_error = f"Client error: {str(e)}"
+            except Exception as e:
+                last_error = f"Unexpected error: {str(e)}"
+            
+            # If this wasn't the last attempt, wait before retrying
+            if attempt < max_retries - 1:
+                # Exponential backoff: 0.5s, 1s, 2s
+                wait_time = 0.5 * (2 ** attempt)
+                await asyncio.sleep(wait_time)
+        
+        # All retries failed
+        return {"success": False, "error": last_error or "Unknown error"}
 
     async def load_market_meta(self):
         """Loads market metadata (asset IDs) on initialization."""

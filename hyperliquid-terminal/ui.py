@@ -98,19 +98,21 @@ class CandlestickChart(Static):
             lows = [float(c['l']) for c in self.candle_data]
             closes = [float(c['c']) for c in self.candle_data]
             
-            # Get widget dimensions
+            # Get widget dimensions - INCREASED for better resolution
             if self.content_size and self.content_size.width > 0:
                 width = self.content_size.width
-                height = self.content_size.height
+                # Increase height significantly for better vertical resolution
+                height = max(self.content_size.height, 25)
             else:
-                width = max(self.size.width - 4, 60)
-                height = max(self.size.height - 2, 15)
+                width = max(self.size.width - 4, 80)
+                # Minimum height increased to 25 for better candle detail
+                height = max(self.size.height - 2, 25)
             
             # Clear and configure plotext
             plt.clf()
             plt.theme('dark')
             
-            # Set plot size
+            # Set plot size with enhanced resolution
             plt.plotsize(width, height)
             
             # Prepare candlestick data
@@ -121,16 +123,81 @@ class CandlestickChart(Static):
                 'Close': closes
             }
             
-            # Draw candlestick chart with custom colors
+            # Calculate price range for better y-axis scaling
+            all_prices = opens + highs + lows + closes
+            min_price = min(all_prices)
+            max_price = max(all_prices)
+            price_range = max_price - min_price
+            
+            # Add padding to y-axis (5% on each side for better visibility)
+            padding = price_range * 0.05
+            y_min = min_price - padding
+            y_max = max_price + padding
+            
+            # Draw candlestick chart
             plt.candlestick(timestamps, data)
             
-            # Configure appearance
-            plt.title(f"{self.symbol}/USD ({self.interval})")
+            # Configure y-axis with ROUND number price levels
+            # Determine appropriate step size to show ~5 price levels
+            if price_range > 5000:
+                step = 1000  # For BTC: 91000, 92000, 93000, 94000, 95000
+                decimals = 0
+            elif price_range > 1000:
+                step = 250   # 90000, 90250, 90500...
+                decimals = 0
+            elif price_range > 500:
+                step = 100   # 1000, 1100, 1200...
+                decimals = 0
+            elif price_range > 100:
+                step = 25    # 1000, 1025, 1050...
+                decimals = 0
+            elif price_range > 50:
+                step = 10    # 100, 110, 120...
+                decimals = 0
+            elif price_range > 10:
+                step = 2     # 10, 12, 14...
+                decimals = 1
+            elif price_range > 1:
+                step = 0.5   # 5.0, 5.5, 6.0...
+                decimals = 1
+            elif price_range > 0.1:
+                step = 0.1   # 1.0, 1.1, 1.2...
+                decimals = 2
+            else:
+                step = 0.02  # 0.10, 0.12, 0.14...
+                decimals = 3
             
-            # Set x-axis labels (time)
-            num_labels = 5
+            # Round min/max to step boundaries for perfect calibration
+            import math
+            rounded_min = math.floor(y_min / step) * step
+            rounded_max = math.ceil(y_max / step) * step
+            
+            # Set ylim to ROUNDED values for perfect tick alignment
+            plt.ylim(rounded_min, rounded_max)
+            
+            # Generate round number ticks
+            y_values = []
+            current = rounded_min
+            while current <= rounded_max:
+                y_values.append(current)
+                current += step
+            
+            # Format labels with appropriate decimals
+            if y_values:
+                y_labels = [f"{y:.{decimals}f}" for y in y_values]
+                plt.yticks(y_values, y_labels)
+            
+            # Add horizontal line at current price (last close)
+            current_price = closes[-1]
+            plt.hline(current_price, color="cyan")
+            
+            # Configure appearance - show current price in title
+            plt.title(f"{self.symbol}/USD ({self.interval}) | Price: {current_price:,.2f}")
+            
+            # Set x-axis labels (time) - increased number for better granularity
+            num_labels = min(7, len(timestamps))
             if len(timestamps) >= num_labels:
-                step = len(timestamps) // (num_labels - 1)
+                step = len(timestamps) // (num_labels - 1) if num_labels > 1 else 1
                 label_indices = [i * step for i in range(num_labels - 1)] + [len(timestamps) - 1]
                 label_times = [timestamps[i] for i in label_indices]
                 label_strings = [datetime.fromtimestamp(t).strftime('%H:%M') for t in label_times]
@@ -198,8 +265,8 @@ class HyperliquidApp(App):
 
         # Initial fetch
         await self.update_market_data()
-        # Set interval for dynamic updates (0.3s for maximum speed)
-        self.set_interval(0.3, self.update_market_data)
+        # Set interval for dynamic updates (0.5s for stability)
+        self.set_interval(0.4, self.update_market_data)
 
     def update_title(self):
         self.title = f"Hyperliquid Terminal | Asset: {self.current_asset_ticker}"
@@ -211,11 +278,11 @@ class HyperliquidApp(App):
         if self.current_asset_id is None:
             return
 
-        # Fetch L2 Book
+        # Fetch L2 Book - only clear and update if successful
         l2_book_data = await self.api_client.get_l2_book(self.current_asset_id)
-        ob_table = self.query_one("#order_book_table", DataTable)
-        ob_table.clear()
         if l2_book_data["success"]:
+            ob_table = self.query_one("#order_book_table", DataTable)
+            ob_table.clear()  # Clear only on success
             asks = l2_book_data["data"]["asks"][:10]  # Best 10 asks
             bids = l2_book_data["data"]["bids"][:10]  # Best 10 bids
             
@@ -257,11 +324,11 @@ class HyperliquidApp(App):
                     f"{bid_cumulative:.5f}"
                 )
 
-        # Fetch Recent Trades
+        # Fetch Recent Trades - only clear and update if successful
         trades_data = await self.api_client.get_trades(self.current_asset_id)
-        trades_table = self.query_one("#trades_table", DataTable)
-        trades_table.clear()
         if trades_data["success"]:
+            trades_table = self.query_one("#trades_table", DataTable)
+            trades_table.clear()  # Clear only on success
             for trade in trades_data["data"][:25]:
                 time_str = datetime.fromtimestamp(trade['time'] / 1000).strftime("%H:%M:%S")
                 side_color = "#26a69a" if trade['side'] == 'B' else "#ef5350"
@@ -273,38 +340,30 @@ class HyperliquidApp(App):
                     time_str
                 )
 
-        # Fetch Candle Data for selected asset (fetch more for chart)
-        # Use current timeframe and limit to 60 for better zoom
+        # Fetch Candle Data for selected asset - only update if successful
         candle_data = await self.api_client.get_candle_data(
             self.current_asset_id, 
             interval=self.current_timeframe, 
-            limit=60
+            limit=40
         )
         
-        # Update Main Chart
-        chart_data = candle_data["data"] if candle_data["success"] else []
-        chart = self.query_one("#main_chart", CandlestickChart)
-        chart.symbol = self.current_asset_ticker
-        chart.interval = self.current_timeframe
+        # Update Main Chart only if data was successfully fetched
+        if candle_data["success"] and candle_data["data"]:
+            chart = self.query_one("#main_chart", CandlestickChart)
+            chart.symbol = self.current_asset_ticker
+            chart.interval = self.current_timeframe
+            chart.update_plot(candle_data["data"])
         
-        if chart_data:
-             chart.update_plot(chart_data)
-        else:
-             chart.update(f"Error/No Data for Chart")
-        # Fetch Market Info
+        # Fetch Market Info - only update on success
         market_info_widget = self.query_one(MarketInfoWidget)
         oi_data = await self.api_client.get_open_interest(self.current_asset_id)
         if oi_data.get("success"):
             market_info_widget.open_interest = f"{float(oi_data['data']['openInterest']):.2f}"
-        else:
-            market_info_widget.open_interest = "N/A"
         
         funding_data = await self.api_client.get_funding_rate(self.current_asset_id)
         if funding_data.get("success") and funding_data.get("data"):
             fr = float(funding_data['data'].get('fundingRate', 0))
-            market_info_widget.funding_rate = f"{fr:.6%}" # Show as percentage
-        else:
-            market_info_widget.funding_rate = "N/A"
+            market_info_widget.funding_rate = f"{fr:.6%}"
 
     def action_switch_asset(self) -> None:
         """Show the asset selection screen."""
