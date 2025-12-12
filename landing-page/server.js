@@ -102,7 +102,7 @@ const rateLimitMiddleware = (req, res, next) => {
 };
 
 // Middleware
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // Helper: Check Token Balance
