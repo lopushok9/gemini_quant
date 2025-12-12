@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <title>Quanty - Terminal Access</title>
+
+    <!-- Fonts: Fira Code for Terminal Feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Ionicons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <!-- Solana Web3.js -->
+    <script src="https://unpkg.com/@solana/web3.js@1.91.8/lib/index.iife.min.js"></script>
+    <!-- Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Inline BS58 Implementation -->
+    <script>
+        const bs58 = {
+            encode: (source) => {
+                const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+                if (source.length === 0) return "";
+                let digits = [0];
+                for (let i = 0; i < source.length; ++i) {
+                    let carry = source[i];
+                    for (let j = 0; j < digits.length; ++j) {
+                        carry += digits[j] << 8;
+                        digits[j] = carry % 58;
+                        carry = (carry / 58) | 0;
+                    }
+                    while (carry > 0) {
+                        digits.push(carry % 58);
+                        carry = (carry / 58) | 0;
+                    }
+                }
+                let string = "";
+                for (let k = 0; source[k] === 0 && k < source.length - 1; ++k) string += ALPHABET[0];
+                for (let k = digits.length - 1; k >= 0; --k) string += ALPHABET[digits[k]];
+                return string;
+            }
+        };
+    </script>
+
+    <style>
+        /* Terminal Theme Overrides */
+        :root {
+            --term-bg: #0c0c0c;
+            --term-text: #04d674;
+            /* Quanty Green default */
+            --term-dim: #4a5c53;
+            --term-cursor: #04d674;
+            --term-font: 'Fira Code', monospace;
+        }
+
+        .chat-main {
+            background-color: #000;
+            padding: 20px;
+            font-family: var(--term-font);
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .chat-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+            border: 1px solid #333;
+            background: var(--term-bg);
+            border-radius: 6px;
+            box-shadow: 0 0 20px rgba(4, 214, 116, 0.05);
+            display: flex;
+            flex-direction: column;
+            height: 70vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Terminal Header Strip */
+        .terminal-header {
+            background: #1a1a1a;
+            padding: 8px 15px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .terminal-controls {
+            display: flex;
+            gap: 6px;
+        }
+
+        .control-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #555;
+        }
+
+        .control-dot.close {
+            background: #ff5f56;
+        }
+
+        .control-dot.min {
+            background: #ffbd2e;
+        }
+
+        .control-dot.max {
+            background: #27c93f;
+        }
+
+        /* Messages Area */
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            color: #ccc;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+            background: #000;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        /* Message Styling */
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message-user {
+            color: #fff;
+            border-left: 2px solid var(--term-text);
+            padding-left: 10px;
+        }
+
+        .message-ai {
+            color: #bbb;
+        }
+
+        .message-ai strong {
+            color: var(--term-text);
+            font-weight: 600;
+        }
+
+        .message-ai h1,
+        .message-ai h2,
+        .message-ai h3 {
+            color: #fff;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            font-weight: 500;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 5px;
+        }
+
+        .welcome-block {
+            text-align: left;
+            /* Terminal style usually left aligned */
+            padding: 20px 0;
+            color: var(--term-text);
+        }
+
+        .ascii-art {
+            white-space: pre;
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-bottom: 20px;
+            line-height: 1.1;
+        }
+
+        /* Input Area command line style */
+        .input-area {
+            background: #0c0c0c;
+            border-top: 1px solid #333;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-prompt {
+            color: var(--term-text);
+            margin-right: 10px;
+            font-weight: bold;
+            user-select: none;
+        }
+
+        .terminal-input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: var(--term-font);
+            font-size: 1rem;
+            flex: 1;
+            outline: none;
+            caret-color: var(--term-cursor);
+        }
+
+        .cursor-block {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background: var(--term-cursor);
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Auth Banner override */
+        .payment-banner {
+            background: #111;
+            border-bottom: 1px solid #333;
+            padding: 10px;
+            font-size: 0.85rem;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .payment-banner.connected {
+            color: var(--term-text);
+            background: rgba(4, 214, 116, 0.05);
+        }
+
+        /* Auth Buttons overrides for terminal feel */
+        .wallet-btn {
+            background: transparent;
+            border: 1px solid #444;
+            color: #aaa;
+            font-family: var(--term-font);
+        }
+
+        .wallet-btn:hover {
+            border-color: var(--term-text);
+            color: var(--term-text);
+            box-shadow: 0 0 10px rgba(4, 214, 116, 0.2);
+        }
+
+        .wallet-btn.connected {
+            border-color: var(--term-text);
+            color: var(--term-text);
+            background: rgba(4, 214, 116, 0.1);
+        }
+
+        .disconnect-btn {
+            border: 1px solid #553333;
+            color: #cc4444;
+            background: transparent;
+        }
+
+        .disconnect-btn:hover {
+            border-color: #ff4d4d;
+            color: #ff4d4d;
+        }
+
+        /* Nav overrides specific to chat page if needed, but keeping global nav */
+        /* Force nav to blend better */
+        .chat-page .navbar {
+            background: #000;
+            border-bottom: 1px solid #222;
+        }
+    </style>
+</head>
+
+<body class="chat-page">
+
+    <nav class="navbar">
+        <div class="logo">Quanty_Terminal v0.1</div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/about">About</a>
+            <a href="/how-to-use">How to Use</a>
+            <a href="/chat" class="active">Terminal</a>
+        </div>
+        <div class="nav-actions">
+            <!-- Auth Buttons -->
+            <div id="authContainer">
+                <button id="authBtn" class="wallet-btn" onclick="handleAuth()">
+                    <span id="authText">[CONNECT_WALLET]</span>
+                </button>
+                <button id="disconnectBtn" class="disconnect-btn" onclick="disconnectWallet()" style="display: none;">
+                    <ion-icon name="power-outline"></ion-icon>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="chat-main">
+        <div class="chat-container">
+            <!-- Terminal Header -->
+            <div class="terminal-header">
+                <div class="terminal-controls">
+                    <span class="control-dot close"></span>
+                    <span class="control-dot min"></span>
+                    <span class="control-dot max"></span>
+                </div>
+                <div>user@quanty-ai:~/research</div>
+                <div>bash</div>
+            </div>
+
+            <!-- Auth Status Strip -->
+            <div class="payment-banner" id="authBanner">
+                <span>[SYSTEM] ACCESS RESTRICTED: TOKEN_GATE_ACTIVE (> 700k REQ)</span>
+            </div>
+
+            <!-- Messages Area -->
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-block">
+                    <div class="ascii-art">
+
+                        ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓███████▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░
+                        ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░ ░▒▓█▓▒░░▒▓█▓▒░
+                        ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░ ░▒▓█▓▒░░▒▓█▓▒░
+                        ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░ ░▒▓██████▓▒░
+                        ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░ ░▒▓█▓▒░
+                        ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░ ░▒▓█▓▒░
+                        ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░ ░▒▓█▓▒░
+
+
+
+                    </div>
+                    <div>Investment Terminal v0.1</div>
+                    <div>System ready. Authorization required for shell access.</div>
+                    <br>
+                    <div>Enter target ticker (e.g. BTC, NVDA, AAPL) to initiate analysis sequence...</div>
+                </div>
+            </div>
+
+            <!-- Command Line Input -->
+            <div class="input-area">
+                <span class="input-prompt">user@quanty:~$ analysis --ticker</span>
+                <input type="text" id="tickerInput" class="terminal-input" placeholder="BTC" autocomplete="off"
+                    spellcheck="false">
+                <!-- <span class="cursor-block"></span> -->
+            </div>
+        </div>
+    </main>
+
+    <footer class="site-footer" style="background: #000; border-top: 1px solid #222;">
+        <div class="footer-content">
+            <div class="copyright" style="font-family: 'Fira Code', monospace; font-size: 0.8rem; color: #555;">
+                &copy; 2025 Quanty
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        let authToken = localStorage.getItem('quanty_auth_token');
+        let phantomProvider = null;
+
+        // --- Auth & Wallet Logic ---
+        const getProvider = () => {
+            if ('phantom' in window) {
+                const provider = window.phantom?.solana;
+                if (provider?.isPhantom) return provider;
+            }
+            return null;
+        };
+
+        async function handleAuth() {
+            const provider = getProvider();
+            if (!provider) {
+                window.open('https://phantom.app/', '_blank');
+                alert("Please install Phantom Wallet!");
+                return;
+            }
+
+            try {
+                const resp = await provider.connect();
+                phantomProvider = provider;
+                const publicKey = resp.publicKey.toString();
+
+                const timestamp = Date.now();
+                const message = `Access Quanty AI - Date: ${timestamp}`;
+                const encodedMessage = new TextEncoder().encode(message);
+                const { signature } = await provider.signMessage(encodedMessage, "utf8");
+
+                // Using Inline BS58 from <head>
+                const bs58Signature = bs58.encode(signature);
+
+                addMessage(`[AUTH_SEQ] Verifying identity via Solana Mainnet...`, true, false, true);
+
+                const loginResp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        publicKey: publicKey,
+                        signature: bs58Signature,
+                        timestamp: timestamp
+                    })
+                });
+
+                const data = await loginResp.json();
+
+                if (loginResp.ok && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('quanty_auth_token', authToken);
+                    updateAuthUI(true, publicKey, data.balance);
+                    addMessage(`[SUCCESS] Access Granted. Balance: ${data.balance.toFixed(0)} Tokens.`, false, false, true);
+                } else {
+                    addMessage(`[ERROR] Auth Failed: ${data.error}. Required: 700,000. Balance: ${data.balance}`, false, false, true);
+                    updateAuthUI(false, publicKey, data.balance);
+                }
+
+            } catch (err) {
+                console.error("Auth Error:", err);
+                addMessage(`[ERROR] Authentication process interrupted.`, false, false, true);
+            }
+        }
+
+        async function disconnectWallet() {
+            if (phantomProvider) {
+                try {
+                    await phantomProvider.disconnect();
+                } catch (e) { console.log('Disconnect error', e); }
+            }
+            authToken = null;
+            localStorage.removeItem('quanty_auth_token');
+            updateAuthUI(false, null);
+            addMessage(`[SYSTEM] Session terminated. Disconnected.`, false, false, true);
+        }
+
+        function updateAuthUI(isAuthenticated, pubKey, balance) {
+            const btn = document.getElementById('authBtn');
+            const txt = document.getElementById('authText');
+            const banner = document.getElementById('authBanner');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+
+            if (isAuthenticated) {
+                btn.classList.add('connected');
+                btn.onclick = null;
+                txt.textContent = `[ ${pubKey.slice(0, 4)}..${pubKey.slice(-4)} ]`;
+
+                banner.innerHTML = `<span>[SYSTEM] SECURE CONNECTION ESTABLISHED | BAL: ${balance ? balance.toFixed(0) : 'OK'}</span>`;
+                banner.classList.add('connected');
+                banner.style.color = '#04d674';
+
+                disconnectBtn.style.display = 'inline-flex';
+            } else {
+                btn.classList.remove('connected');
+                btn.onclick = handleAuth;
+                txt.textContent = '[ CONNECT_WALLET ]';
+                disconnectBtn.style.display = 'none';
+
+                if (balance !== undefined) {
+                    banner.innerHTML = `<span style="color: #ff4d4d">[SYSTEM] ACCESS DENIED: INSUFFICIENT BALANCE (${balance})</span>`;
+                } else {
+                    banner.innerHTML = `<span>[SYSTEM] ACCESS RESTRICTED: TOKEN_GATE_ACTIVE (> 700k REQ)</span>`;
+                    banner.classList.remove('connected');
+                    banner.style.color = '#aaa';
+                }
+            }
+        }
+
+        // --- Terminal IO Logic ---
+
+        // Auto Focus
+        document.addEventListener('click', () => {
+            // document.getElementById('tickerInput').focus(); // Optional auto focus
+        });
+
+        document.getElementById('tickerInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function addMessage(content, isUser = false, isStreaming = false, isSystem = false) {
+            const messagesContainer = document.getElementById('chatMessages');
+
+            // Remove welcome if needed, or just append
+            // const welcome = messagesContainer.querySelector('.welcome-block');
+            // if (welcome && isUser) welcome.style.display = 'none';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'message-user' : 'message-ai'}`;
+
+            if (isSystem) {
+                messageDiv.innerHTML = `<div style="color: #888;">${content}</div>`;
+            } else if (isUser) {
+                messageDiv.innerHTML = `<div><span style="color: #4a5c53;">root@quanty:~#</span> analysis --target ${content}</div>`;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="ai-response">${isStreaming ? '<span class="cursor-block"></span>' : marked.parse(content)}</div>
+                `;
+            }
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return messageDiv;
+        }
+
+        function updateAIMessage(messageDiv, content) {
+            const responseDiv = messageDiv.querySelector('.ai-response');
+            responseDiv.innerHTML = marked.parse(content);
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('tickerInput');
+            const ticker = input.value.trim().toUpperCase();
+
+            if (!ticker) return;
+
+            if (!authToken) {
+                addMessage(`[ERROR] Permission denied: No active session. Please connect wallet.`, false, false, true);
+                return;
+            }
+
+            input.value = '';
+            input.disabled = true;
+
+            addMessage(ticker, true);
+            const aiMessage = addMessage('', false, true);
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ message: ticker }) // No mode needed, server defaults
+                });
+
+                if (response.status === 401 || response.status === 403) {
+                    updateAIMessage(aiMessage, '**[SYSTEM] Session Expired or Access Revoked.**');
+                    authToken = null;
+                    localStorage.removeItem('quanty_auth_token');
+                    updateAuthUI(false, null);
+                    throw new Error('Auth Failed');
+                }
+
+                if (!response.ok) throw new Error('API request failed');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.content) {
+                                    fullContent += parsed.content;
+                                    updateAIMessage(aiMessage, fullContent);
+                                }
+                            } catch (e) { }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+                if (error.message !== 'Auth Failed') {
+                    updateAIMessage(aiMessage, '**[ERROR] Process terminated unexpectedly.**');
+                }
+            } finally {
+                input.disabled = false;
+                input.focus();
+            }
+        }
+
+        window.addEventListener('load', async () => {
+            if (authToken) {
+                const banner = document.getElementById('authBanner');
+                banner.innerHTML = `<span>[SYSTEM] SESSION RESTORED | READY</span>`;
+                banner.classList.add('connected');
+                banner.style.color = '#04d674';
+                document.getElementById('authBtn').classList.add('connected');
+                document.getElementById('authText').textContent = '[SESSION_ACTIVE]';
+                document.getElementById('disconnectBtn').style.display = 'inline-flex';
+            }
+        });
+    </script>
+</body>
+
+</html>

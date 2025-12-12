@@ -68,6 +68,7 @@ a:hover {
     font-size: 1.2rem;
     letter-spacing: -0.5px;
     width: 120px;
+    color: #63d776;
     /* Fixed width to help centering siblings if needed, or flex basis */
 }
 
@@ -686,5 +687,551 @@ a:hover {
 
     .footer-links a {
         margin: 0 1rem;
+    }
+}
+
+/* ========================================
+   CHAT PAGE STYLES
+   ======================================== */
+
+.chat-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.chat-main {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.chat-container {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+}
+
+/* Mode Selector */
+.mode-selector {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.mode-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 12px 20px;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #64748b;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mode-btn:hover {
+    border-color: #e2e8f0;
+    color: #334155;
+}
+
+.mode-btn.active {
+    background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+.mode-btn ion-icon {
+    font-size: 1.1rem;
+}
+
+/* Chat Messages Area */
+.chat-messages {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: 400px;
+    max-height: 60vh;
+}
+
+/* Welcome Message */
+.welcome-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: #64748b;
+}
+
+.welcome-icon {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+    border-radius: 20px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 8px 24px rgba(74, 144, 226, 0.3);
+}
+
+.welcome-icon ion-icon {
+    font-size: 40px;
+    color: #ffffff;
+}
+
+.welcome-message h2 {
+    font-size: 1.8rem;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.welcome-message p {
+    color: #64748b;
+    margin-bottom: 1.5rem;
+}
+
+.example-tickers {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.ticker-example {
+    padding: 8px 16px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    font-family: 'Menlo', monospace;
+    font-size: 0.9rem;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ticker-example:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+    transform: translateY(-2px);
+}
+
+/* Messages */
+.message {
+    margin-bottom: 1.5rem;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-user .message-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.message-label {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.ticker-tag {
+    display: inline-flex;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+    color: #ffffff;
+    border-radius: 8px;
+    font-family: 'Menlo', monospace;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.mode-tag {
+    padding: 6px 12px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.message-ai .message-content {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+.ai-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: #4A90E2;
+    font-weight: 600;
+}
+
+.ai-header ion-icon {
+    font-size: 1.2rem;
+}
+
+.ai-response {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #9d9fa4;
+}
+
+.ai-response h1,
+.ai-response h2,
+.ai-response h3 {
+    font-family: var(--font-heading);
+    color: #1e293b;
+    margin: 1.5rem 0 1rem;
+}
+
+.ai-response h1 {
+    font-size: 1.5rem;
+}
+
+.ai-response h2 {
+    font-size: 1.3rem;
+}
+
+.ai-response h3 {
+    font-size: 1.1rem;
+}
+
+.ai-response p {
+    margin-bottom: 1rem;
+}
+
+.ai-response ul,
+.ai-response ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.ai-response li {
+    margin-bottom: 0.5rem;
+}
+
+.ai-response table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+}
+
+.ai-response th,
+.ai-response td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.ai-response th {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #475569;
+}
+
+.ai-response code {
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Menlo', monospace;
+    font-size: 0.85em;
+}
+
+.ai-response pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.ai-response pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+}
+
+.ai-response strong {
+    color: #1e293b;
+}
+
+.ai-response blockquote {
+    border-left: 4px solid #4A90E2;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    color: #64748b;
+    font-style: italic;
+}
+
+/* Typing Indicator */
+.typing-indicator {
+    display: inline-flex;
+    gap: 4px;
+    padding: 8px 0;
+}
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background: #4A90E2;
+    border-radius: 50%;
+    animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+
+    0%,
+    60%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+
+    30% {
+        transform: translateY(-8px);
+        opacity: 1;
+    }
+}
+
+/* Chat Input */
+.chat-input-container {
+    padding: 1.5rem;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+}
+
+.chat-input-wrapper {
+    display: flex;
+    gap: 0.75rem;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 6px;
+    transition: border-color 0.2s ease;
+}
+
+.chat-input-wrapper:focus-within {
+    border-color: #4A90E2;
+}
+
+.chat-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 12px 16px;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: #1e293b;
+    outline: none;
+}
+
+.chat-input::placeholder {
+    color: #94a3b8;
+}
+
+.send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+    border: none;
+    border-radius: 12px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.send-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+}
+
+.send-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.send-btn ion-icon {
+    font-size: 1.3rem;
+}
+
+.input-hint {
+    text-align: center;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.input-hint span {
+    color: #4A90E2;
+    font-weight: 600;
+}
+
+/* Chat Page Responsiveness */
+@media (max-width: 768px) {
+    .chat-main {
+        padding: 1rem;
+    }
+
+    .chat-container {
+        border-radius: 16px;
+    }
+
+    .mode-selector {
+        flex-direction: column;
+        padding: 1rem;
+    }
+
+    .mode-btn {
+        padding: 10px 16px;
+    }
+
+    .chat-messages {
+        padding: 1rem;
+        min-height: 300px;
+    }
+
+    .message-ai .message-content {
+        padding: 1rem;
+    }
+
+    .nav-links a.active {
+        color: var(--color-accent);
+    }
+}
+
+/* Active nav link */
+.nav-links a.active {
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+/* ========================================
+   WALLET & PAYMENT STYLES
+   ======================================== */
+
+/* Wallet Button */
+.wallet-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #9945FF 0%, #14F195 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.wallet-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(153, 69, 255, 0.4);
+}
+
+.wallet-btn.connected {
+    background: linear-gradient(135deg, #14F195 0%, #9945FF 100%);
+}
+
+.wallet-btn ion-icon {
+    font-size: 1.1rem;
+}
+
+/* Payment Banner */
+.payment-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, rgba(153, 69, 255, 0.1) 0%, rgba(20, 241, 149, 0.1) 100%);
+    border-bottom: 1px solid rgba(153, 69, 255, 0.2);
+    color: #9945FF;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.payment-banner ion-icon {
+    font-size: 1.2rem;
+}
+
+.payment-banner.connected {
+    background: linear-gradient(135deg, rgba(20, 241, 149, 0.15) 0%, rgba(153, 69, 255, 0.1) 100%);
+    border-color: rgba(20, 241, 149, 0.3);
+    color: #14F195;
+}
+
+/* Price Info */
+.price-info {
+    margin-top: 1rem;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(153, 69, 255, 0.1) 0%, rgba(20, 241, 149, 0.1) 100%);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #9945FF;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .wallet-btn {
+        padding: 8px 14px;
+        font-size: 0.85rem;
+    }
+
+    .wallet-btn span {
+        display: none;
+    }
+
+    .payment-banner {
+        font-size: 0.8rem;
+        padding: 10px 15px;
     }
 }
