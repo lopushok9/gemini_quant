@@ -669,6 +669,17 @@ a:hover {
     font-size: 0.85rem;
 }
 
+.footer-ca {
+    margin-top: 2rem;
+    text-align: center;
+    color: #9CA3AF;
+    font-size: 0.9rem;
+    font-family: 'Menlo', 'Monaco', monospace;
+    word-break: break-all;
+    padding: 0 1rem;
+    line-height: 1.5;
+}
+
 /* Responsiveness */
 @media (max-width: 768px) {
     .hero-title {
