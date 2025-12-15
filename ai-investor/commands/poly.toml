@@ -1,0 +1,9 @@
+# poly command
+name = "poly"
+description = "Analyzes a Polymarket market using AI search and analysis.USES PROMPT FILE: ai-investor/poly.md"
+
+[[args]]
+name = "market_question"
+description = "The question or URL of the Polymarket market."
+type = "string"
+required = true
