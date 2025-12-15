@@ -33,7 +33,11 @@ const port = 3000;
 // Token Gating Configuration
 const TOKEN_MINT_ADDRESS = process.env.TOKEN_MINT_ADDRESS;
 const MIN_TOKEN_AMOUNT = parseFloat(process.env.MIN_TOKEN_AMOUNT || '0');
-const JWT_SECRET = process.env.JWT_SECRET || 'default_secret_please_change';
+if (!process.env.JWT_SECRET) {
+    console.error('FATAL ERROR: JWT_SECRET is not defined. Server cannot start securely.');
+    process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
@@ -168,7 +172,8 @@ app.post('/api/auth/login', async (req, res) => {
 
         // Check Token Balance
         if (!TOKEN_MINT_ADDRESS) {
-            console.warn('TOKEN_MINT_ADDRESS not set, skipping balance check');
+            console.error('SECURITY ERROR: TOKEN_MINT_ADDRESS not set. Denying access.');
+            return res.status(500).json({ error: 'Server configuration error: Token Gate missing' });
         } else {
             const balance = await checkTokenBalance(publicKey);
             if (balance < MIN_TOKEN_AMOUNT) {
