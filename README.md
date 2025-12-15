@@ -53,6 +53,9 @@ Once installed, you can use these commands directly in your terminal, it may tak
 | `gemini analyze [TICKER]` | **Long-term investment analysis**. Generates a full research report with BUY/SELL/HOLD rating, price targets, risk assessment. | `gemini analyze AAPL` |
 | `gemini analyze-st [TICKER]` | **Short-term trading analysis**. Focuses on technical indicators, momentum, and near-term catalysts for swing trading. | `gemini analyze-st TSLA` |
 | `gemini analyze-lev [TICKER]` | **Leveraged trading analysis**. Evaluates assets for short-term leveraged positions with specific entry/exit points. | `gemini analyze-lev BTC` |
+| `gemini poly-s` | **Polymarket Scanner**. Scans the top Finance & Economy markets for high-potential trading opportunities. | `gemini poly-s` |
+| `gemini poly [TOPIC]` | **Polymarket Analysis**. Deep dive into a specific prediction market to find +EV opportunities. | `gemini poly "Bitcoin price"` |
+
 
 
 ---
@@ -79,6 +82,11 @@ The agent follows a strict 3-pillar investigative strategy:
 *   **Institutional-Grade Reports**: Generates reports with specific "BUY/SELL/HOLD" ratings, price targets (with upside/downside %), and conviction levels.
 *   **Risk Assessment**: Detailed breakdown of company, macro, and ESG risks, including specific position sizing recommendations.
 *   **Catalyst Tracking**: Identifies near-term (earnings), medium-term (strategic), and event-driven (M&A) catalysts.
+
+### Polymarket Intelligence
+The agent now includes specialized tools for analyzing prediction markets:
+*   **Market Scanner (`poly-s`)**: Identifies high-value opportunities by analyzing market discrepancies and "overextended" odds in Finance & Economy sectors.
+*   **Deep Analysis (`poly`)**: Conducts a rigorous EV (Expected Value) analysis on specific markets, comparing implied probabilities with real-world data and sentiment.
 
 ---
 
