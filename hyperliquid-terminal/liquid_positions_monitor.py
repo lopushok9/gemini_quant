@@ -57,24 +57,23 @@ class LiquidationRiskCalculator:
         side: str,  # "LONG" or "SHORT"
         maintenance_margin_rate: float = 0.004  # 0.4% default
     ) -> float:
+        """Calculate liquidation price for a position.
+
+        Approximation based on initial margin (= notional / leverage) and maintenance margin.
+
+        - LONG:  P_liq = entry_price * (1 - 1/leverage) / (1 - maintenance_margin_rate)
+        - SHORT: P_liq = entry_price * (1 + 1/leverage) / (1 + maintenance_margin_rate)
         """
-        Calculate liquidation price for a position.
-        
-        For perpetual swaps, liquidation occurs when:
-        - LONG: (Entry Price / (1 - Maintenance Margin * Leverage)) * (1 - Maintenance Margin)
-        - SHORT: (Entry Price / (1 + Maintenance Margin * Leverage)) * (1 + Maintenance Margin)
-        """
-        if leverage <= 0 or position_size <= 0 or entry_price <= 0:
+        if leverage <= 1 or position_size <= 0 or entry_price <= 0:
             return 0.0
-        
-        if side.upper() == "LONG":
-            # Liquidation price for long position
-            liquidation_price = entry_price * (1 - maintenance_margin_rate * leverage) / (1 - maintenance_margin_rate)
+
+        side_u = side.upper()
+        if side_u == "LONG":
+            liquidation_price = entry_price * (1 - 1 / leverage) / (1 - maintenance_margin_rate)
         else:
-            # Liquidation price for short position
-            liquidation_price = entry_price * (1 + maintenance_margin_rate * leverage) / (1 + maintenance_margin_rate)
-        
-        return liquidation_price
+            liquidation_price = entry_price * (1 + 1 / leverage) / (1 + maintenance_margin_rate)
+
+        return max(0.0, liquidation_price)
     
     @staticmethod
     def calculate_distance_to_liquidation(
@@ -85,9 +84,17 @@ class LiquidationRiskCalculator:
         """Calculate percentage distance to liquidation."""
         if current_price <= 0 or liquidation_price <= 0:
             return float('inf')
-        
-        # For both LONG and SHORT: calculate the percentage buffer to liquidation price
-        return max(0.0, ((current_price - liquidation_price) / current_price) * 100)
+
+        side_u = side.upper()
+        if side_u == "SHORT":
+            distance = ((liquidation_price - current_price) / current_price) * 100
+        else:
+            distance = ((current_price - liquidation_price) / current_price) * 100
+
+        distance = max(0.0, distance)
+        if 0 < distance < 0.01:
+            return 0.01
+        return distance
     
     @staticmethod
     def calculate_pnl(

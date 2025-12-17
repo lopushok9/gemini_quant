@@ -147,11 +147,13 @@ Price:        $98.45
 ### 1. Расчет уровней ликвидации
 
 ```python
-# Для лонг позиции:
-liquidation_price = entry_price * (1 - maintenance_margin_rate * leverage) / (1 - maintenance_margin_rate)
+# Приближение на основе initial margin (= notional / leverage) и maintenance margin
 
-# Для шорт позиции:  
-liquidation_price = entry_price * (1 + maintenance_margin_rate * leverage) / (1 + maintenance_margin_rate)
+# Для лонг позиции:
+liquidation_price = entry_price * (1 - 1 / leverage) / (1 - maintenance_margin_rate)
+
+# Для шорт позиции:
+liquidation_price = entry_price * (1 + 1 / leverage) / (1 + maintenance_margin_rate)
 ```
 
 ### 2. Определение крупных позиций
