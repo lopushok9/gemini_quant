@@ -193,11 +193,11 @@ class RealLiquidationsMonitor:
             
             position_size = position_value / entry_price
             
-            # Calculate actual distance to liquidation
+            # Calculate actual distance to liquidation (always positive)
             if side == "LONG":
-                distance_to_liq = ((current_price - liq_price) / liq_price) * 100
+                distance_to_liq = ((current_price - liq_price) / current_price) * 100
             else:
-                distance_to_liq = ((liq_price - current_price) / current_price) * 100
+                distance_to_liq = ((current_price - liq_price) / current_price) * 100
             
             # Calculate PnL
             if side == "LONG":
@@ -251,19 +251,19 @@ class RealLiquidationsMonitor:
                 entry_price = liq_price * (1 - risk_buffer/100)
             
             position_size = position_value / entry_price
-            
+
             if side == "LONG":
-                distance_to_liq = ((current_price - liq_price) / liq_price) * 100
+                distance_to_liq = ((current_price - liq_price) / current_price) * 100
             else:
-                distance_to_liq = ((liq_price - current_price) / current_price) * 100
-            
+                distance_to_liq = ((current_price - liq_price) / current_price) * 100
+
             if side == "LONG":
                 pnl_usd = (current_price - entry_price) * position_size
                 pnl_pct = (current_price - entry_price) / entry_price
             else:
                 pnl_usd = (entry_price - current_price) * position_size
                 pnl_pct = (entry_price - current_price) / entry_price
-            
+
             if distance_to_liq <= 2:
                 risk_level = "CRITICAL"
             elif distance_to_liq <= 5:
@@ -272,7 +272,7 @@ class RealLiquidationsMonitor:
                 risk_level = "MEDIUM"
             else:
                 risk_level = "LOW"
-            
+
             positions.append({
                 "asset": asset,
                 "side": side,
@@ -289,66 +289,18 @@ class RealLiquidationsMonitor:
                 "position_type": "MEDIUM"
             })
         
-        # Small retail positions (lower leverage)
-        for i in range(generator["small_positions"]):
-            position_value = random.uniform(1000, 20000)  # $1k - $20k
-            leverage = random.uniform(2, 10)  # Lower leverage
-            side = "LONG" if random.random() > 0.5 else "SHORT"
-            
-            risk_buffer = random.uniform(10, 50)  # 10-50% away from liquidation
-            
-            if side == "LONG":
-                maintenance_rate = 0.004
-                liq_price = current_price * (1 + risk_buffer/100) * (1 - maintenance_rate * leverage) / (1 - maintenance_rate)
-                entry_price = liq_price * (1 + risk_buffer/100)
-            else:
-                maintenance_rate = 0.004
-                liq_price = current_price * (1 - risk_buffer/100) * (1 + maintenance_rate * leverage) / (1 + maintenance_rate)
-                entry_price = liq_price * (1 - risk_buffer/100)
-            
-            position_size = position_value / entry_price
-            
-            if side == "LONG":
-                distance_to_liq = ((current_price - liq_price) / liq_price) * 100
-            else:
-                distance_to_liq = ((liq_price - current_price) / current_price) * 100
-            
-            if side == "LONG":
-                pnl_usd = (current_price - entry_price) * position_size
-                pnl_pct = (current_price - entry_price) / entry_price
-            else:
-                pnl_usd = (entry_price - current_price) * position_size
-                pnl_pct = (entry_price - current_price) / entry_price
-            
-            if distance_to_liq <= 2:
-                risk_level = "CRITICAL"
-            elif distance_to_liq <= 5:
-                risk_level = "HIGH"
-            elif distance_to_liq <= 10:
-                risk_level = "MEDIUM"
-            else:
-                risk_level = "LOW"
-            
-            positions.append({
-                "asset": asset,
-                "side": side,
-                "position_size": position_size,
-                "position_value_usd": position_value,
-                "entry_price": entry_price,
-                "current_price": current_price,
-                "liquidation_price": liq_price,
-                "leverage": leverage,
-                "distance_to_liquidation": distance_to_liq,
-                "pnl_usd": pnl_usd,
-                "pnl_pct": pnl_pct,
-                "risk_level": risk_level,
-                "position_type": "RETAIL"
-            })
+        # Small retail positions (lower leverage) - REMOVED FROM OUTPUT
+        # Skip retail positions entirely
         
         return sorted(positions, key=lambda x: x["distance_to_liquidation"])
     
     def display_critical_positions(self, asset: str, positions: List[Dict]):
         """Display only the most critical positions at risk."""
+        if not positions:
+            return
+        
+        # Filter out RETAIL positions from display
+        positions = [p for p in positions if p.get("position_type") != "RETAIL"]
         if not positions:
             return
         
@@ -410,6 +362,8 @@ class RealLiquidationsMonitor:
                 oi_usd = oi * price
                 
                 positions = all_positions.get(asset, [])
+                # Filter out RETAIL positions
+                positions = [p for p in positions if p.get("position_type") != "RETAIL"]
                 critical = len([p for p in positions if p["risk_level"] == "CRITICAL"])
                 high_risk = len([p for p in positions if p["risk_level"] == "HIGH"])
                 
