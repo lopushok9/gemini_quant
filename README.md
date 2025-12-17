@@ -119,7 +119,7 @@ python3 main.py
 This script provides a of Hyperliquid positions, focusing on large positions (≥ $100k) that are approaching liquidation.
 #### Features
 
-*   **Realistic Position**:Large and medium-sized positions with varying leverage and proximity to liquidation based on current market conditions.
+*   **Position**:Large and medium-sized positions with varying leverage and proximity to liquidation based on current market conditions.
 *   **Market Summary**: Provides an overview of market risk, including total critical positions and value at risk.
 *   **Configurable Assets**: Monitor key assets like BTC, ETH, SOL. 
 
