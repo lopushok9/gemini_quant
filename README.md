@@ -143,3 +143,34 @@ To monitor all configured assets:
 python3 liquid.py
 ```
 
+### Hyperliquid Large Trades Monitor (`large_trades.py`)
+
+This script monitors Hyperliquid in real-time for executed large trades on specified assets. Using a WebSocket connection, it provides immediate alerts for trades exceeding a configurable notional value (default: $100,000 USD).
+
+#### Features
+
+*   **Real-time Monitoring**: Connects via WebSocket to receive live trade data.
+*   **Configurable Threshold**: Easily set the minimum notional value for trades to be alerted.
+*   **Asset Filtering**: Monitor all configured assets or focus on a specific one via command-line.
+*   **Concise Output**: Displays essential trade details (time, asset, side, price, size, notional value).
+
+#### Installation & Run
+
+```bash
+cd hyperliquid-terminal
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python3 large_trades.py [ASSET]
+```
+
+**Example:**
+To monitor large trades for ETH:
+```bash
+python3 large_trades.py ETH
+```
+To monitor all configured assets:
+```bash
+python3 large_trades.py
+```
+
