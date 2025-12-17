@@ -69,8 +69,16 @@ class RealLiquidationsMonitor:
         if current_price <= 0 or liquidation_price <= 0:
             return float("inf")
 
-        # For both LONG and SHORT: calculate the percentage buffer to liquidation price
-        return max(0.0, ((current_price - liquidation_price) / current_price) * 100)
+        side_u = side.upper()
+        if side_u == "SHORT":
+            distance = ((liquidation_price - current_price) / current_price) * 100
+        else:
+            distance = ((current_price - liquidation_price) / current_price) * 100
+
+        distance = max(0.0, distance)
+        if 0 < distance < 0.01:
+            return 0.01
+        return distance
         
     def _initialize_position_generators(self):
         """Initialize realistic position generators for each asset."""
@@ -188,16 +196,14 @@ class RealLiquidationsMonitor:
             # Place entry price closer to liquidation for risk
             risk_buffer = random.uniform(1, 8)  # 1-8% away from liquidation
             
+            maintenance_rate = 0.004
+
             if side == "LONG":
-                # Long liquidation price: entry * (1 - 0.004 * leverage) / (1 - 0.004)
-                maintenance_rate = 0.004
-                liq_price = current_price * (1 + risk_buffer/100) * (1 - maintenance_rate * leverage) / (1 - maintenance_rate)
-                entry_price = liq_price * (1 + risk_buffer/100)
+                liq_price = current_price * (1 - risk_buffer / 100)
+                entry_price = liq_price * (1 - maintenance_rate) / (1 - 1 / leverage)
             else:
-                # Short liquidation price: entry * (1 + 0.004 * leverage) / (1 + 0.004)
-                maintenance_rate = 0.004
-                liq_price = current_price * (1 - risk_buffer/100) * (1 + maintenance_rate * leverage) / (1 + maintenance_rate)
-                entry_price = liq_price * (1 - risk_buffer/100)
+                liq_price = current_price * (1 + risk_buffer / 100)
+                entry_price = liq_price * (1 + maintenance_rate) / (1 + 1 / leverage)
             
             position_size = position_value / entry_price
             
@@ -245,14 +251,14 @@ class RealLiquidationsMonitor:
             
             risk_buffer = random.uniform(5, 20)  # 5-20% away from liquidation
             
+            maintenance_rate = 0.004
+
             if side == "LONG":
-                maintenance_rate = 0.004
-                liq_price = current_price * (1 + risk_buffer/100) * (1 - maintenance_rate * leverage) / (1 - maintenance_rate)
-                entry_price = liq_price * (1 + risk_buffer/100)
+                liq_price = current_price * (1 - risk_buffer / 100)
+                entry_price = liq_price * (1 - maintenance_rate) / (1 - 1 / leverage)
             else:
-                maintenance_rate = 0.004
-                liq_price = current_price * (1 - risk_buffer/100) * (1 + maintenance_rate * leverage) / (1 + maintenance_rate)
-                entry_price = liq_price * (1 - risk_buffer/100)
+                liq_price = current_price * (1 + risk_buffer / 100)
+                entry_price = liq_price * (1 + maintenance_rate) / (1 + 1 / leverage)
             
             position_size = position_value / entry_price
 
