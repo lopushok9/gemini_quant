@@ -69,11 +69,8 @@ class RealLiquidationsMonitor:
         if current_price <= 0 or liquidation_price <= 0:
             return float("inf")
 
-        side = side.upper()
-        if side == "LONG":
-            return max(0.0, ((current_price - liquidation_price) / current_price) * 100)
-
-        return max(0.0, ((liquidation_price - current_price) / current_price) * 100)
+        # For both LONG and SHORT: calculate the percentage buffer to liquidation price
+        return max(0.0, ((current_price - liquidation_price) / current_price) * 100)
         
     def _initialize_position_generators(self):
         """Initialize realistic position generators for each asset."""

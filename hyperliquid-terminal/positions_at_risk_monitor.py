@@ -86,10 +86,8 @@ class PositionRiskCalculator:
         if current_price <= 0 or liquidation_price <= 0:
             return float('inf')
         
-        if side.upper() == "LONG":
-            return ((current_price - liquidation_price) / liquidation_price) * 100
-        else:
-            return ((liquidation_price - current_price) / current_price) * 100
+        # For both LONG and SHORT: calculate the percentage buffer to liquidation price
+        return max(0.0, ((current_price - liquidation_price) / current_price) * 100)
     
     @staticmethod
     def estimate_max_leverage(margin_tiers: List[Dict], position_value_usd: float) -> float:
