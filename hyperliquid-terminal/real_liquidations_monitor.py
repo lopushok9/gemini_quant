@@ -54,15 +54,26 @@ class RealLiquidationsMonitor:
         self.session: Optional[aiohttp.ClientSession] = None
         self.asset_map: Dict[str, int] = {}
         self.id_to_name: Dict[int, str] = {}
-        
+
         # Position tracking
         self.active_positions: Dict[str, List[Dict]] = {}
         self.position_history: Dict[str, List[Dict]] = defaultdict(lambda: deque(maxlen=100))
         self.check_count = 0
-        
+
         # Realistic position simulation
         self.position_generators = {}
         self._initialize_position_generators()
+
+    @staticmethod
+    def _calculate_distance_to_liquidation(current_price: float, liquidation_price: float, side: str) -> float:
+        if current_price <= 0 or liquidation_price <= 0:
+            return float("inf")
+
+        side = side.upper()
+        if side == "LONG":
+            return max(0.0, ((current_price - liquidation_price) / current_price) * 100)
+
+        return max(0.0, ((liquidation_price - current_price) / current_price) * 100)
         
     def _initialize_position_generators(self):
         """Initialize realistic position generators for each asset."""
@@ -193,11 +204,7 @@ class RealLiquidationsMonitor:
             
             position_size = position_value / entry_price
             
-            # Calculate actual distance to liquidation (always positive)
-            if side == "LONG":
-                distance_to_liq = ((current_price - liq_price) / current_price) * 100
-            else:
-                distance_to_liq = ((current_price - liq_price) / current_price) * 100
+            distance_to_liq = self._calculate_distance_to_liquidation(current_price, liq_price, side)
             
             # Calculate PnL
             if side == "LONG":
@@ -252,10 +259,7 @@ class RealLiquidationsMonitor:
             
             position_size = position_value / entry_price
 
-            if side == "LONG":
-                distance_to_liq = ((current_price - liq_price) / current_price) * 100
-            else:
-                distance_to_liq = ((current_price - liq_price) / current_price) * 100
+            distance_to_liq = self._calculate_distance_to_liquidation(current_price, liq_price, side)
 
             if side == "LONG":
                 pnl_usd = (current_price - entry_price) * position_size
@@ -311,10 +315,22 @@ class RealLiquidationsMonitor:
         print(f"🚨 ПОЗИЦИИ НА ГРАНИ ЛИКВИДАЦИИ - {asset} - {timestamp} 🚨")
         print(f"{sep}")
         
-        # Group by risk level
-        critical_positions = [p for p in positions if p["risk_level"] == "CRITICAL"]
-        high_risk_positions = [p for p in positions if p["risk_level"] == "HIGH"]
-        medium_risk_positions = [p for p in positions if p["risk_level"] == "MEDIUM"]
+        # Group by risk level (show biggest positions first)
+        critical_positions = sorted(
+            (p for p in positions if p["risk_level"] == "CRITICAL"),
+            key=lambda p: p["position_value_usd"],
+            reverse=True,
+        )
+        high_risk_positions = sorted(
+            (p for p in positions if p["risk_level"] == "HIGH"),
+            key=lambda p: p["position_value_usd"],
+            reverse=True,
+        )
+        medium_risk_positions = sorted(
+            (p for p in positions if p["risk_level"] == "MEDIUM"),
+            key=lambda p: p["position_value_usd"],
+            reverse=True,
+        )
         
         total_at_risk = len(critical_positions) + len(high_risk_positions)
         
