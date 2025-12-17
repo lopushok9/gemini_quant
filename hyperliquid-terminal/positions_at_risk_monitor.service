@@ -1,0 +1,34 @@
+[Unit]
+Description=Hyperliquid Positions at Risk Monitor
+Documentation=https://github.com/your-repo/hyperliquid-terminal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hyperliquid
+Group=hyperliquid
+WorkingDirectory=/opt/hyperliquid-terminal
+ExecStart=/usr/bin/python3 /opt/hyperliquid-terminal/positions_at_risk_monitor.py
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/hyperliquid-terminal/logs
+
+# Resource limits
+MemoryLimit=256M
+CPUQuota=50%
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
