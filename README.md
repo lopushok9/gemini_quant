@@ -114,62 +114,32 @@ python3 main.py
 *   `t` - Change Timeframe
 *   `q` - Quit
 
-### Liquidations Monitor
+### Hyperliquid Laverege Health Positions Monitor (`liquid.py`)
 
-A **standalone script** that monitors large liquidations on Hyperliquid in real-time for BTC, ETH, and SOL.
+This script provides a of Hyperliquid positions, focusing on large positions (≥ $100k) that are approaching liquidation.
+#### Features
 
-#### Quick Start
+*   **Realistic Position**:Large and medium-sized positions with varying leverage and proximity to liquidation based on current market conditions.
+*   **Market Summary**: Provides an overview of market risk, including total critical positions and value at risk.
+*   **Configurable Assets**: Monitor key assets like BTC, ETH, SOL. 
+
+#### Installation & Run
 
 ```bash
 cd hyperliquid-terminal
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Run with default $50k threshold
-python3 liquidations_monitor_advanced.py
-
-# Run with custom threshold (e.g., $10k)
-python3 liquidations_monitor_advanced.py 10000
-
-# Or use the launcher script
-./run_liquidations_monitor.sh 50000 advanced
+python3 liquid.py [ASSET]
 ```
 
-#### Features
-
-*   ✅ Real-time monitoring of BTC, ETH, SOL liquidations
-*   ✅ Configurable USD threshold filter
-*   ✅ Detailed liquidation information (price, size, type)
-*   ✅ Session statistics and breakdown by asset/type
-*   ✅ Simple and Advanced modes available
-
-For detailed documentation, see [`hyperliquid-terminal/LIQUIDATIONS_README.md`](hyperliquid-terminal/LIQUIDATIONS_README.md)
-
-### Positions at Risk Monitor
-
-A **preventive monitoring system** that analyzes positions close to liquidation before they actually get liquidated.
-
-#### Quick Start
-
+**Example:**
+To monitor simulated positions for BTC:
 ```bash
-cd hyperliquid-terminal
-pip3 install aiohttp certifi
-
-# Simple mode (recommended for beginners)
-python3 positions_at_risk_monitor_simple.py
-
-# Advanced mode (detailed risk analysis)
-python3 positions_at_risk_monitor.py
+python3 liquid.py BTC
+```
+To monitor all configured assets:
+```bash
+python3 liquid.py
 ```
 
-#### Features
-
-*   🎯 Real-time Open Interest tracking with change detection
-*   📈 Funding rate and premium monitoring
-*   🚨 Liquidation risk analysis for large positions
-*   ⚡ Preventive alerts before liquidations occur
-*   📊 Market status updates every 60 seconds
-*   🟢🟡🔴 Color-coded funding rate indicators
-
-For detailed documentation, see [`hyperliquid-terminal/POSITIONS_RISK_README.md`](hyperliquid-terminal/POSITIONS_RISK_README.md) or [`hyperliquid-terminal/QUICK_START_POSITIONS_MONITOR.md`](hyperliquid-terminal/QUICK_START_POSITIONS_MONITOR.md) for a quick guide.
-
----
