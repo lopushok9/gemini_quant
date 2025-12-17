@@ -39,6 +39,7 @@ class SimpleRiskMonitor:
         self.asset_map: Dict[str, int] = {}
         self.id_to_name: Dict[int, str] = {}
         self.last_oi_data: Dict[str, float] = {}
+        self.check_count = 0
         
     async def _ensure_session(self):
         if self.session is None or self.session.closed:
@@ -130,6 +131,32 @@ class SimpleRiskMonitor:
         print(f"💰 Min OI: ${MIN_OPEN_INTEREST_USD:,.0f}")
         print(f"🕐 Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{sep}")
+    
+    def display_market_status(self, market_data: Dict):
+        """Display current market status."""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        print(f"\n[{timestamp}] 📊 Market Status:")
+        
+        for asset in MONITORED_ASSETS:
+            if asset in market_data:
+                data = market_data[asset]
+                price = data["markPrice"]
+                oi = data["openInterest"]
+                funding = data["fundingRate"]
+                premium = data["premium"]
+                oi_usd = oi * price
+                
+                oi_change = ""
+                if asset in self.last_oi_data and self.last_oi_data[asset] > 0:
+                    change_pct = (oi_usd - self.last_oi_data[asset]) / self.last_oi_data[asset]
+                    oi_change = f" ({change_pct:+.1%})"
+                
+                funding_indicator = "🔴" if abs(funding) > 0.001 else "🟡" if abs(funding) > 0.0005 else "🟢"
+                
+                print(f"  {asset:6} | Price: ${price:>10,.2f} | OI: ${oi_usd:>12,.0f}{oi_change:>8} | "
+                      f"Funding: {funding_indicator} {funding:+.4%} | Premium: {premium:+.3%}")
+            else:
+                print(f"  {asset:6} | No data")
     
     def display_risk_alert(self, asset: str, alert_type: str, details: Dict):
         sep = "=" * DISPLAY_WIDTH
@@ -227,22 +254,31 @@ class SimpleRiskMonitor:
             self.print_header()
             
             print("🔍 Starting simple risk monitoring...")
-            print(f"📊 Checking every {POLL_INTERVAL_SECONDS} seconds\n")
+            print(f"📊 Checking every {POLL_INTERVAL_SECONDS} seconds")
+            print(f"💡 Status updates every 60 seconds\n")
             
             while True:
                 try:
+                    self.check_count += 1
                     market_data = await self.get_market_data()
                     
                     if market_data:
+                        # Show status every 60 seconds (assuming 10 sec intervals = 6 checks per minute)
+                        checks_per_minute = max(1, int(60 / POLL_INTERVAL_SECONDS))
+                        if self.check_count % checks_per_minute == 1 or self.check_count == 1:
+                            self.display_market_status(market_data)
+                        
                         for asset in MONITORED_ASSETS:
                             await self.check_simple_risks(asset, market_data)
+                    else:
+                        print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] No market data received")
                     
                     await asyncio.sleep(POLL_INTERVAL_SECONDS)
                     
                 except KeyboardInterrupt:
                     raise
                 except Exception as e:
-                    print(f"⚠️ Error: {e}")
+                    print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] Error: {e}")
                     await asyncio.sleep(RETRY_DELAY_SECONDS)
                     
         except KeyboardInterrupt:

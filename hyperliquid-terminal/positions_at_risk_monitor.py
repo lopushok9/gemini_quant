@@ -125,6 +125,7 @@ class PositionsAtRiskMonitor:
         
         # Risk alerts
         self.risk_alerts: List[Dict] = []
+        self.check_count = 0
         
     async def _ensure_session(self):
         if self.session is None or self.session.closed:
@@ -411,6 +412,35 @@ class PositionsAtRiskMonitor:
         
         print(f"{sep}")
     
+    def display_market_status(self, market_data: Dict):
+        """Display current market status."""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        print(f"\n[{timestamp}] 📊 Market Status:")
+        
+        for asset in MONITORED_ASSETS:
+            if asset in market_data:
+                data = market_data[asset]
+                price = data["markPrice"]
+                oi = data["openInterest"]
+                funding = data["fundingRate"]
+                premium = data["premium"]
+                oi_usd = oi * price
+                
+                oi_change = ""
+                if asset in self.open_interest_history and len(self.open_interest_history[asset]) >= 2:
+                    current_oi = self.open_interest_history[asset][-1]
+                    previous_oi = self.open_interest_history[asset][-2]
+                    if previous_oi > 0:
+                        change_pct = (current_oi - previous_oi) / previous_oi
+                        oi_change = f" ({change_pct:+.1%})"
+                
+                funding_indicator = "🔴" if abs(funding) > 0.001 else "🟡" if abs(funding) > 0.0001 else "🟢"
+                
+                print(f"  {asset:6} | Price: ${price:>10,.2f} | OI: ${oi_usd:>12,.0f}{oi_change:>8} | "
+                      f"Funding: {funding_indicator} {funding:+.4%} | Premium: {premium:+.3%}")
+            else:
+                print(f"  {asset:6} | No data")
+    
     def print_header(self):
         """Print monitoring header."""
         sep = "=" * DISPLAY_WIDTH
@@ -428,16 +458,23 @@ class PositionsAtRiskMonitor:
     async def monitor_risk_factors(self):
         """Main monitoring loop."""
         self.print_header()
+        print(f"💡 Status updates every 60 seconds\n")
         
         while True:
             try:
+                self.check_count += 1
+                
                 # Get current market data
                 market_data = await self.get_market_data()
                 
                 if market_data:
-                    print(f"🔍 Scanning {len(MONITORED_ASSETS)} assets...")
+                    # Show status every 60 seconds
+                    checks_per_minute = max(1, int(60 / POLL_INTERVAL_SECONDS))
+                    if self.check_count % checks_per_minute == 1 or self.check_count == 1:
+                        self.display_market_status(market_data)
                     
                     # Analyze each asset
+                    has_alerts = False
                     for asset in MONITORED_ASSETS:
                         risk_factors = await self.analyze_risk_factors(asset, market_data)
                         
@@ -451,19 +488,25 @@ class PositionsAtRiskMonitor:
                                 if self.consecutive_alerts[alert_key] >= ALERT_CONSECUTIVE_COUNT:
                                     if ENABLE_ALERTS:
                                         self.display_risk_alert(risk_factor)
+                                        has_alerts = True
                                     
                                     # Reset counter after alerting
                                     self.consecutive_alerts[alert_key] = 0
                             else:
                                 # Reset counter for lower severity alerts
                                 self.consecutive_alerts[alert_key] = 0
+                    
+                    if not has_alerts and self.check_count % checks_per_minute == 1:
+                        print(f"✅ No critical risks detected")
+                else:
+                    print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] No market data received")
                 
                 await asyncio.sleep(POLL_INTERVAL_SECONDS)
                 
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                print(f"⚠️ Error in monitoring loop: {e}")
+                print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] Error in monitoring loop: {e}")
                 await asyncio.sleep(RETRY_DELAY_SECONDS)
     
     async def run(self):

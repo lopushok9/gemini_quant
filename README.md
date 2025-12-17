@@ -144,4 +144,32 @@ python3 liquidations_monitor_advanced.py 10000
 
 For detailed documentation, see [`hyperliquid-terminal/LIQUIDATIONS_README.md`](hyperliquid-terminal/LIQUIDATIONS_README.md)
 
+### Positions at Risk Monitor
+
+A **preventive monitoring system** that analyzes positions close to liquidation before they actually get liquidated.
+
+#### Quick Start
+
+```bash
+cd hyperliquid-terminal
+pip3 install aiohttp certifi
+
+# Simple mode (recommended for beginners)
+python3 positions_at_risk_monitor_simple.py
+
+# Advanced mode (detailed risk analysis)
+python3 positions_at_risk_monitor.py
+```
+
+#### Features
+
+*   🎯 Real-time Open Interest tracking with change detection
+*   📈 Funding rate and premium monitoring
+*   🚨 Liquidation risk analysis for large positions
+*   ⚡ Preventive alerts before liquidations occur
+*   📊 Market status updates every 60 seconds
+*   🟢🟡🔴 Color-coded funding rate indicators
+
+For detailed documentation, see [`hyperliquid-terminal/POSITIONS_RISK_README.md`](hyperliquid-terminal/POSITIONS_RISK_README.md) or [`hyperliquid-terminal/QUICK_START_POSITIONS_MONITOR.md`](hyperliquid-terminal/QUICK_START_POSITIONS_MONITOR.md) for a quick guide.
+
 ---
