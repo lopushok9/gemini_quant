@@ -20,7 +20,7 @@ except ImportError:
     RETRY_DELAY_SECONDS = 5
 
 
-MIN_TRADE_NOTIONAL_USD = 1_000_000
+MIN_TRADE_NOTIONAL_USD = 100_000
 
 
 def _fmt_usd(value: float) -> str:
