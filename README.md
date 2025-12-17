@@ -90,12 +90,15 @@ The agent now includes specialized tools for analyzing prediction markets:
 
 ---
 
-## Hyperliquid Terminal 
+## Hyperliquid Tools
 
-Included in this suite is a **Terminal User Interface (TUI)** for monitoring assets on Hyperliquid. It provides a distraction-free, keyboard-driven environment for execution.
+Included in this suite are tools for monitoring and analyzing Hyperliquid markets.
 
+### Hyperliquid Terminal (TUI)
 
-### Installation & Run
+A **Terminal User Interface (TUI)** for monitoring assets on Hyperliquid. It provides a distraction-free, keyboard-driven environment for execution.
+
+#### Installation & Run
 
 ```bash
 cd hyperliquid-terminal
@@ -105,10 +108,40 @@ pip install -r requirements.txt
 python3 main.py
 ```
 
-### Controls
+#### Controls
 
 *   `s` - Switch Asset
 *   `t` - Change Timeframe
 *   `q` - Quit
+
+### Liquidations Monitor
+
+A **standalone script** that monitors large liquidations on Hyperliquid in real-time for BTC, ETH, and SOL.
+
+#### Quick Start
+
+```bash
+cd hyperliquid-terminal
+pip install -r requirements.txt
+
+# Run with default $50k threshold
+python3 liquidations_monitor_advanced.py
+
+# Run with custom threshold (e.g., $10k)
+python3 liquidations_monitor_advanced.py 10000
+
+# Or use the launcher script
+./run_liquidations_monitor.sh 50000 advanced
+```
+
+#### Features
+
+*   ✅ Real-time monitoring of BTC, ETH, SOL liquidations
+*   ✅ Configurable USD threshold filter
+*   ✅ Detailed liquidation information (price, size, type)
+*   ✅ Session statistics and breakdown by asset/type
+*   ✅ Simple and Advanced modes available
+
+For detailed documentation, see [`hyperliquid-terminal/LIQUIDATIONS_README.md`](hyperliquid-terminal/LIQUIDATIONS_README.md)
 
 ---
