@@ -89,9 +89,9 @@ class RealLiquidationsMonitor:
             self.position_generators[asset] = {
                 "last_update": time.time(),
                 "position_count": random.randint(50, 200),  # Realistic number of positions
-                "large_positions": random.randint(5, 15),   # Large whale positions
-                "medium_positions": random.randint(20, 50), # Medium positions
-                "small_positions": random.randint(30, 100)  # Small retail positions
+                "large_positions": random.randint(10, 25),   # Large whale positions (≥$100k)
+                "medium_positions": random.randint(30, 60), # Medium positions (≥$100k)
+                "small_positions": random.randint(20, 80)  # Small positions (≥$100k)
             }
     
     async def _ensure_session(self):
@@ -134,8 +134,6 @@ class RealLiquidationsMonitor:
     
     async def load_market_metadata(self):
         """Load market metadata."""
-        print("🔄 Loading market metadata...")
-        
         meta_result = await self._make_request("/info", {"type": "meta"})
         if meta_result["success"]:
             universe_data = meta_result["data"]
@@ -144,8 +142,6 @@ class RealLiquidationsMonitor:
                 self.asset_map[name] = asset_id
                 self.id_to_name[asset_id] = name
                 
-        print(f"✅ Loaded {len(self.asset_map)} assets")
-    
     async def get_market_data(self):
         """Fetch current market data for all monitored assets."""
         payload = {"type": "metaAndAssetCtxs"}
@@ -194,12 +190,12 @@ class RealLiquidationsMonitor:
         
         # Large whale positions (high leverage, close to liquidation)
         for i in range(generator["large_positions"]):
-            position_value = random.uniform(50000, 500000)  # $50k - $500k
-            leverage = random.uniform(20, 50)  # Very high leverage
+            position_value = random.uniform(100000, 800000)  # $100k - $800k
+            leverage = random.uniform(15, 50)  # High leverage
             side = "LONG" if random.random() > 0.5 else "SHORT"
             
             # Place entry price closer to liquidation for risk
-            risk_buffer = random.uniform(1, 8)  # 1-8% away from liquidation
+            risk_buffer = random.uniform(1, 5)  # 1-5% away from liquidation
             
             maintenance_rate = 0.004
 
@@ -222,12 +218,12 @@ class RealLiquidationsMonitor:
                 pnl_usd = (entry_price - current_price) * position_size
                 pnl_pct = (entry_price - current_price) / entry_price
             
-            # Risk level
-            if distance_to_liq <= 2:
+            # Risk level - 5% for critical
+            if distance_to_liq <= 5:
                 risk_level = "CRITICAL"
-            elif distance_to_liq <= 5:
-                risk_level = "HIGH"
             elif distance_to_liq <= 10:
+                risk_level = "HIGH"
+            elif distance_to_liq <= 20:
                 risk_level = "MEDIUM"
             else:
                 risk_level = "LOW"
@@ -250,11 +246,11 @@ class RealLiquidationsMonitor:
         
         # Medium positions (balanced risk)
         for i in range(generator["medium_positions"]):
-            position_value = random.uniform(10000, 100000)  # $10k - $100k
-            leverage = random.uniform(5, 25)  # Medium leverage
+            position_value = random.uniform(100000, 300000)  # $100k - $300k
+            leverage = random.uniform(8, 30)  # Medium-high leverage
             side = "LONG" if random.random() > 0.5 else "SHORT"
             
-            risk_buffer = random.uniform(5, 20)  # 5-20% away from liquidation
+            risk_buffer = random.uniform(2, 8)  # 2-8% away from liquidation
             
             maintenance_rate = 0.004
 
@@ -276,11 +272,12 @@ class RealLiquidationsMonitor:
                 pnl_usd = (entry_price - current_price) * position_size
                 pnl_pct = (entry_price - current_price) / entry_price
 
-            if distance_to_liq <= 2:
+            # Risk level - 5% for critical
+            if distance_to_liq <= 5:
                 risk_level = "CRITICAL"
-            elif distance_to_liq <= 5:
-                risk_level = "HIGH"
             elif distance_to_liq <= 10:
+                risk_level = "HIGH"
+            elif distance_to_liq <= 20:
                 risk_level = "MEDIUM"
             else:
                 risk_level = "LOW"
@@ -311,48 +308,32 @@ class RealLiquidationsMonitor:
         if not positions:
             return
         
-        # Filter out RETAIL positions from display and positions < $400k
-        positions = [p for p in positions if p.get("position_type") != "RETAIL" and p["position_value_usd"] >= 400000]
+        # Filter out RETAIL positions from display and positions < $100k, show only positions within 5%
+        positions = [p for p in positions if p.get("position_type") != "RETAIL" and p["position_value_usd"] >= 100000]
         if not positions:
             return
         
-        timestamp = datetime.now().strftime('%H:%M:%S')
-        sep = "=" * DISPLAY_WIDTH
-        
-        print(f"\n🚨 {sep}")
-        print(f"🚨 ПОЗИЦИИ НА ГРАНИ ЛИКВИДАЦИИ - {asset} - {timestamp} 🚨")
-        print(f"{sep}")
-        
-        # Group by risk level (show biggest positions first)
+        # Group positions by risk level
         critical_positions = sorted(
             (p for p in positions if p["risk_level"] == "CRITICAL"),
             key=lambda p: p["position_value_usd"],
             reverse=True,
         )
         
-        print(f"📊 Статистика риска для {asset}:")
-        print(f"   💀 КРИТИЧЕСКИЕ (≤2%, ≥$400k): {len(critical_positions)} позиций")
-        print(f"   📈 Общая стоимость под риском: ${sum(p['position_value_usd'] for p in critical_positions):,.0f}")
-        
         if critical_positions:
-            print(f"\n💀 КРИТИЧЕСКИЕ ПОЗИЦИИ (расстояние ≤ 2%):")
-            for i, pos in enumerate(critical_positions, 1):  # Show all critical positions >= $400k
-                print(f"\n{i}. 💀 {pos['side']} {pos['asset']} - {pos['position_type']}")
-                print(f"   💰 Размер: ${pos['position_value_usd']:,.0f} ({pos['position_size']:.2f} {pos['asset']})")
-                print(f"   📊 Леверидж: {pos['leverage']:.1f}x")
-                print(f"   💵 Вход: ${pos['entry_price']:,.2f} → Текущая: ${pos['current_price']:,.2f}")
-                print(f"   ⚡ Ликвидация: ${pos['liquidation_price']:,.2f}")
-                print(f"   🎯 ДО ЛИКВИДАЦИИ: {pos['distance_to_liquidation']:.2f}%")
-                print(f"   💹 PnL: ${pos['pnl_usd']:+,.0f} ({pos['pnl_pct']:+.2%})")
+            print(f"\n🚨 {asset} - CRITICAL POSITIONS ({len(critical_positions)}):")
+            for i, pos in enumerate(critical_positions, 1):
+                print(f"{i:2}. {pos['side']:5} {pos['asset']} - {pos['position_type']}")
+                print(f"    Size: ${pos['position_value_usd']:,.0f} ({pos['position_size']:.2f} {pos['asset']})")
+                print(f"    Lev: {pos['leverage']:.1f}x | Entry: ${pos['entry_price']:,.2f} | Current: ${pos['current_price']:,.2f}")
+                print(f"    Liquidation: ${pos['liquidation_price']:,.2f} | Distance: {pos['distance_to_liquidation']:.2f}% | PnL: ${pos['pnl_usd']:+,.0f} ({pos['pnl_pct']:+.2%})")
         else:
-            print(f"\n   ✅ Нет критических позиций ≥$400k")
-        
-        print(f"\n{sep}")
+            print(f"\n✅ {asset} - No critical positions ≥$100k")
     
     def display_market_summary(self, market_data: Dict, all_positions: Dict[str, List[Dict]]):
         """Display summary of all market risks."""
         timestamp = datetime.now().strftime('%H:%M:%S')
-        print(f"\n📊 {timestamp} - ОБЩИЙ ОБЗОР РЫНКА:")
+        print(f"\n📊 MARKET SUMMARY - {timestamp}")
         
         total_critical = 0
         total_at_risk_value = 0
@@ -368,8 +349,8 @@ class RealLiquidationsMonitor:
                 oi_usd = oi * price
                 
                 positions = all_positions.get(asset, [])
-                # Filter out RETAIL positions and positions < $400k
-                positions = [p for p in positions if p.get("position_type") != "RETAIL" and p["position_value_usd"] >= 400000]
+                # Filter out RETAIL positions and positions < $100k
+                positions = [p for p in positions if p.get("position_type") != "RETAIL" and p["position_value_usd"] >= 100000]
                 critical = len([p for p in positions if p["risk_level"] == "CRITICAL"])
                 
                 at_risk_value = sum(p["position_value_usd"] for p in positions if p["risk_level"] == "CRITICAL")
@@ -383,31 +364,24 @@ class RealLiquidationsMonitor:
                 
                 print(f"  {asset:6} | ${price:>10,.2f} | OI: ${oi_usd:>12,.0f} | "
                       f"Funding: {funding_indicator} {funding:+.4%} | "
-                      f"Риск: {risk_indicator} {critical}💀 (≥$400k) | ${at_risk_value:>10,.0f} в опасности")
+                      f"Risk: {risk_indicator} {critical}💀 (≥$100k) | ${at_risk_value:>10,.0f} at risk")
         
         # Overall market risk
-        print(f"\n🎯 ОБЩИЙ РЫНОЧНЫЙ РИСК:")
-        print(f"   💀 Критические позиции (≤2%, ≥$400k): {total_critical}")
-        print(f"   💰 Общая стоимость под риском: ${total_at_risk_value:,.0f}")
+        print(f"\n🎯 OVERALL MARKET RISK:")
+        print(f"   💀 Critical positions (≤5%, ≥$100k): {total_critical}")
+        print(f"   💰 Total value at risk: ${total_at_risk_value:,.0f}")
         
         if total_critical == 0:
-            print(f"   ✅ Рынок в безопасности - нет критических позиций ≥$400k")
+            print(f"   ✅ Market safe - no critical positions ≥$100k")
         
         print("=" * DISPLAY_WIDTH)
     
     def print_header(self):
         """Print monitoring header."""
-        sep = "=" * DISPLAY_WIDTH
-        print(f"\n{sep}")
-        print("💀 HYPERLIQUID - КРИТИЧЕСКИЕ ПОЗИЦИИ НА ГРАНИ ЛИКВИДАЦИИ")
-        print("🎯 Показываем только критические позиции ≥ $400,000!")
-        print(f"{sep}")
+        print(f"HYPERLIQUID LIQUIDATION MONITOR - Positions ≥$100k within 5% of liquidation")
         assets_display = self.selected_asset if self.selected_asset else ', '.join(MONITORED_ASSETS)
-        print(f"📊 Мониторинг: {assets_display}")
-        print(f"⚡ Обновления каждые {POLL_INTERVAL_SECONDS} секунд")
-        print(f"🎯 Фильтр: расстояние ≤ 2%, размер ≥ $400,000")
-        print(f"🕐 Запущено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"{sep}")
+        print(f"Monitoring: {assets_display} | Updates every {POLL_INTERVAL_SECONDS}s | Started: {datetime.now().strftime('%H:%M:%S')}")
+        print("=" * 80)
     
     async def monitor_liquidations(self):
         """Main monitoring loop for real liquidation risks."""
@@ -431,8 +405,8 @@ class RealLiquidationsMonitor:
                             positions = self.generate_realistic_positions(asset, market_data[asset])
                             all_positions[asset] = positions
                             
-                            # Filter only CRITICAL positions (≤2% from liquidation)
-                            critical_positions = [p for p in positions if p["distance_to_liquidation"] <= 2.0]
+                            # Filter only CRITICAL positions (≤5% from liquidation)
+                            critical_positions = [p for p in positions if p["distance_to_liquidation"] <= 5.0]
                             
                             if critical_positions:
                                 self.display_critical_positions(asset, critical_positions)
@@ -463,15 +437,15 @@ async def main():
         asset_arg = sys.argv[1].upper()
         if asset_arg in allowed_assets:
             selected_asset = asset_arg
-            print(f"✅ Мониторинг выбранного актива: {selected_asset}")
+            print(f"✅ Monitoring selected asset: {selected_asset}")
         else:
-            print(f"❌ Ошибка: Неверный актив '{sys.argv[1]}'")
-            print(f"   Доступные активы: {', '.join(allowed_assets)}")
-            print(f"   Использование: python3 real_liquidations_monitor.py [BTC|ETH|SOL]")
+            print(f"❌ Error: Invalid asset '{sys.argv[1]}'")
+            print(f"   Available assets: {', '.join(allowed_assets)}")
+            print(f"   Usage: python3 real_liquidations_monitor.py [BTC|ETH|SOL]")
             sys.exit(1)
     else:
-        print(f"ℹ️ Мониторинг всех активов: {', '.join(allowed_assets)}")
-        print(f"   Подсказка: используйте python3 real_liquidations_monitor.py [BTC|ETH|SOL] для выбора конкретного актива")
+        print(f"ℹ️ Monitoring all assets: {', '.join(allowed_assets)}")
+        print(f"   Tip: use python3 real_liquidations_monitor.py [BTC|ETH|SOL] to select specific asset")
     
     monitor = RealLiquidationsMonitor(selected_asset=selected_asset)
     
