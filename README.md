@@ -174,3 +174,48 @@ To monitor all configured assets:
 python3 large_trades.py
 ```
 
+---
+
+## Polymarket Tools
+
+Monitor large trades and orders on Polymarket prediction markets.
+
+### Polymarket Large Trades Monitor
+
+A TypeScript-based monitoring system that tracks large trades and orders (>$3,000) on Polymarket. It scans top volume markets and analyzes order books to identify significant trading activity.
+
+#### Features
+
+*   **Real-time Order Book Analysis**: Scans order books for large orders
+*   **Volume Change Detection**: Monitors volume increases across markets
+*   **Top Markets Tracking**: Focuses on highest volume prediction markets
+*   **Configurable Threshold**: Set minimum order size (default: $3,000)
+*   **Rich Console Output**: Detailed market and order information
+
+#### Installation & Run
+
+```bash
+cd Poly
+npm install
+npm test        # Run a quick test
+npm start       # Start continuous monitoring
+# or
+./run.sh        # Alternative runner script
+./run.sh 5000   # Custom threshold: $5,000
+```
+
+**Example Output:**
+```
+🎯 LARGE ORDERS FOUND ON MARKET
+Market:   US recession in 2025?
+Volume:   $10,918,352.82
+
+Large Orders (3):
+🔴 SELL No
+   Size:  300005.05 shares
+   Price: $0.9980
+   Value: $299,405.04
+```
+
+See [Poly/README.md](Poly/README.md) for detailed documentation.
+
