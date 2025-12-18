@@ -130,32 +130,24 @@ export class TradeMonitor {
   }
 
   private displayMarketOrders(market: Market, orders: LargeOrder[]): void {
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`🎯 LARGE ORDERS FOUND ON MARKET`);
-    console.log(`${'='.repeat(80)}`);
-    console.log(`Market:   ${market.question}`);
-    console.log(`Volume:   $${parseFloat(market.volume || '0').toLocaleString()}`);
-    
-    if (market.endDateIso || market.end_date_iso) {
-      const endDate = market.endDateIso || market.end_date_iso;
-      console.log(`Ends:     ${new Date(endDate!).toLocaleDateString()}`);
-    }
-    
-    console.log(`\nLarge Orders (${orders.length}):`);
-    console.log(`${'─'.repeat(80)}`);
-    
-    orders.forEach((order, index) => {
-      const sideSymbol = order.side === 'BUY' ? '🟢' : '🔴';
-      console.log(`${index + 1}. ${sideSymbol} ${order.side} ${order.outcome}`);
-      console.log(`   Size:  ${order.size.toFixed(2)} shares`);
-      console.log(`   Price: $${order.price.toFixed(4)}`);
-      console.log(`   Value: $${order.notional.toFixed(2)}`);
-      if (index < orders.length - 1) {
-        console.log();
-      }
+    orders.forEach((order) => {
+      const isYes = order.outcome.toLowerCase() === 'yes';
+      const isNo = order.outcome.toLowerCase() === 'no';
+      const outcomeDisplay = isYes ? '✅ YES' : (isNo ? '❌ NO' : order.outcome);
+      
+      const sideDisplay = order.side === 'BUY' ? '🟢 BUY' : '🔴 SELL';
+      
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`🚨 INTERESTING POSITION DETECTED`);
+      console.log(`${'='.repeat(80)}`);
+      console.log(`Market:      ${market.question}`);
+      console.log(`Outcome:     ${outcomeDisplay}`);
+      console.log(`Side:        ${sideDisplay}`);
+      console.log(`Price:       $${order.price.toFixed(4)} (${(order.price * 100).toFixed(1)}%)`);
+      console.log(`Size:        ${order.size.toLocaleString()} shares`);
+      console.log(`Value:       $${order.notional.toLocaleString()}`);
+      console.log(`${'='.repeat(80)}\n`);
     });
-    
-    console.log(`${'='.repeat(80)}\n`);
   }
 
   async start(): Promise<void> {
