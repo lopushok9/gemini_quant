@@ -56,9 +56,9 @@ export class TradeMonitor {
       }
 
       if (totalLargeOrders === 0) {
-        console.log(`[${new Date().toLocaleTimeString()}] No large orders found above $${this.minTradeSize.toLocaleString()}`);
+        console.log(`[${new Date().toLocaleTimeString()}] No large orders found above ${this.minTradeSize.toLocaleString()} in price range ${(config.minPrice * 100).toFixed(0)}%-${(config.maxPrice * 100).toFixed(0)}%`);
       } else {
-        console.log(`[${new Date().toLocaleTimeString()}] Found ${totalLargeOrders} large orders`);
+        console.log(`[${new Date().toLocaleTimeString()}] Found ${totalLargeOrders} large orders in middle probability range`);
       }
       
       console.log(`${'='.repeat(80)}\n`);
@@ -160,11 +160,12 @@ export class TradeMonitor {
     console.log(`\n${'='.repeat(80)}`);
     console.log('POLYMARKET LARGE TRADES MONITOR');
     console.log(`${'='.repeat(80)}`);
-    console.log(`Minimum Order Size: $${this.minTradeSize.toLocaleString()}`);
+    console.log(`Minimum Order Size: ${this.minTradeSize.toLocaleString()}`);
+    console.log(`Price Range:        ${(config.minPrice * 100).toFixed(0)}% - ${(config.maxPrice * 100).toFixed(0)}% (middle range only)`);
     console.log(`Poll Interval:      ${this.pollInterval / 1000}s`);
     console.log(`Started at:         ${new Date().toLocaleString()}`);
     console.log(`${'='.repeat(80)}\n`);
-    console.log('Monitoring for large orders and volume changes...\n');
+    console.log('Monitoring for large orders in the middle probability range...\n');
 
     let scanCount = 0;
 
