@@ -1,0 +1,34 @@
+{
+  "name": "polymarket-large-trades-monitor",
+  "version": "1.0.0",
+  "description": "Monitor large trades (>$3,000) on Polymarket",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "tsc -w",
+    "test": "ts-node src/test.ts"
+  },
+  "keywords": [
+    "polymarket",
+    "trading",
+    "monitor",
+    "crypto"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@polymarket/order-utils": "^2.0.0",
+    "axios": "^1.6.0",
+    "ethers": "^5.7.2",
+    "dotenv": "^16.3.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ws": "^8.5.9",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
+}
