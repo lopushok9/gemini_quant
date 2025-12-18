@@ -1,14 +1,15 @@
 # Polymarket Large Trades Monitor
 
-Real-time monitoring system for large trades (>$3,000) on Polymarket prediction markets.
+Real-time monitoring system for large trades (>$5,000) on Polymarket prediction markets, **focusing on middle probability range (25%-75%)** where market uncertainty is highest.
 
 ## Features
 
 - 🔍 **Real-time Trade Monitoring**: Continuously monitors Polymarket for large trades
-- 💰 **Configurable Threshold**: Set minimum trade size (default: $3,000)
-- 📊 **Market Information**: Displays market question, outcome, volume, and end date
+- 💰 **Configurable Threshold**: Set minimum trade size (default: $5,000)
+- 🎯 **Smart Price Filtering**: Only shows trades in 25%-75% probability range (filters out near-certain outcomes)
+- 📊 **Market Information**: Displays market question, outcome (YES/NO), volume, and end date
 - 🎯 **Trade Details**: Shows trade side (BUY/SELL), size, price, and notional value
-- 📈 **Performance Optimized**: Efficient caching and trade deduplication
+- 📈 **Performance Optimized**: Efficient caching and order book analysis
 - 🎨 **Rich Console Output**: Color-coded alerts with formatted information
 
 ## Installation
@@ -38,8 +39,10 @@ cp .env.example .env
 4. (Optional) Edit `.env` to customize settings:
 ```bash
 # Default settings work fine, but you can adjust:
-MIN_TRADE_SIZE=3000        # Minimum trade size in USD
+MIN_TRADE_SIZE=5000        # Minimum trade size in USD
 POLL_INTERVAL=5000         # Polling interval in milliseconds
+MIN_PRICE=0.25             # Minimum price (25% probability)
+MAX_PRICE=0.75             # Maximum price (75% probability)
 ```
 
 ## Usage
@@ -71,40 +74,38 @@ When a large trade is detected, you'll see:
 
 ```
 ================================================================================
-🟢 LARGE TRADE DETECTED | $5,250.00
+🚨 INTERESTING POSITION DETECTED
 ================================================================================
-Time:     12/18/2024, 3:45:23 PM
-Side:     BUY
-Size:     5000.00 shares
-Price:    $1.0500
-Value:    $5,250.00
-
---- Market Information ---
-Question: Will Bitcoin reach $100,000 by end of 2024?
-Outcome:  Yes
-Volume:   $1,234,567.89
-Ends:     12/31/2024
-
-Trader:   0x1234...5678
+Market:      Will Bitcoin reach $100,000 by end of 2024?
+Outcome:     ✅ YES
+Side:        🟢 BUY
+Price:       $0.4500 (45.0%)
+Size:        12,000 shares
+Value:       $5,400
 ================================================================================
 ```
 
+**Note**: Only trades in the 25%-75% probability range are shown, filtering out near-certain outcomes (>75% or <25%) where there is little market uncertainty.
+
 ## How It Works
 
-1. **Polling**: The monitor polls the Polymarket API every 5 seconds (configurable)
-2. **Trade Analysis**: Each trade is analyzed to calculate its notional value (size × price)
-3. **Filtering**: Only trades exceeding the minimum threshold are displayed
-4. **Market Lookup**: For each large trade, market information is fetched and cached
-5. **Deduplication**: Processed trades are tracked to avoid duplicate alerts
+1. **Market Discovery**: Fetches top 30 markets by volume
+2. **Order Book Analysis**: Analyzes order books for each market outcome
+3. **Smart Filtering**: 
+   - Filters by minimum order size (default: $5,000)
+   - Filters by price range (default: 0.25-0.75 / 25%-75%)
+   - Excludes near-certain outcomes to focus on genuine market uncertainty
+4. **Market Information**: Displays market question, outcome (YES/NO), and trade details
+5. **Continuous Monitoring**: Polls every 5 seconds (configurable)
 
 ## API Endpoints Used
 
 - **Gamma API** (`https://gamma-api.polymarket.com`):
-  - `/markets` - Fetch market information
+  - `/markets` - Fetch market information and top volume markets
   - `/markets/{conditionId}` - Get specific market details
 
 - **CLOB API** (`https://clob.polymarket.com`):
-  - `/trades` - Fetch recent trades
+  - `/book` - Fetch order book for each market outcome
 
 ## Configuration
 
@@ -112,12 +113,14 @@ Trader:   0x1234...5678
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MIN_TRADE_SIZE` | Minimum trade size in USD | `3000` |
+| `MIN_TRADE_SIZE` | Minimum trade size in USD | `5000` |
+| `MIN_PRICE` | Minimum price filter (0.0-1.0) | `0.25` |
+| `MAX_PRICE` | Maximum price filter (0.0-1.0) | `0.75` |
 | `POLL_INTERVAL` | Polling interval in milliseconds | `5000` |
 | `POLYMARKET_API_URL` | CLOB API base URL | `https://clob.polymarket.com` |
 | `POLYMARKET_WS_URL` | WebSocket URL (future use) | `wss://ws-subscriptions-clob.polymarket.com/ws` |
 
-### Adjusting the Threshold
+### Adjusting Settings
 
 To monitor trades larger than $10,000:
 ```bash
@@ -125,9 +128,23 @@ To monitor trades larger than $10,000:
 MIN_TRADE_SIZE=10000
 ```
 
-Or set it inline:
+To expand the price range (e.g., 20%-80%):
 ```bash
-MIN_TRADE_SIZE=10000 npm run dev
+# In .env file
+MIN_PRICE=0.20
+MAX_PRICE=0.80
+```
+
+To focus on maximum uncertainty (40%-60%):
+```bash
+# In .env file
+MIN_PRICE=0.40
+MAX_PRICE=0.60
+```
+
+Or set inline:
+```bash
+MIN_TRADE_SIZE=10000 MIN_PRICE=0.30 MAX_PRICE=0.70 npm run dev
 ```
 
 ## Architecture
@@ -149,22 +166,23 @@ src/
 
 ## Performance Considerations
 
-- **Trade Deduplication**: Up to 10,000 trade IDs are cached to prevent duplicate alerts
-- **Market Caching**: Market information is cached indefinitely to reduce API calls
-- **Efficient Polling**: Only fetches recent trades (last hour) to minimize data transfer
+- **Efficient Filtering**: Price range filter reduces noise by focusing on uncertain outcomes
+- **Smart Scanning**: Only scans top 30 markets by volume
+- **Rate Limiting**: 100ms delay between market scans to avoid rate limits
+- **Focused Monitoring**: Analyzes order books instead of historical trades
 
 ## Troubleshooting
 
-### No trades appearing
+### No orders appearing
 
-1. Check if the threshold is too high:
+1. Check if the threshold is too high or price range too narrow:
    ```bash
-   MIN_TRADE_SIZE=500 npm run dev
+   MIN_TRADE_SIZE=1000 MIN_PRICE=0.20 MAX_PRICE=0.80 npm run dev
    ```
 
 2. Verify API connectivity:
    ```bash
-   curl https://clob.polymarket.com/trades?limit=10
+   curl https://gamma-api.polymarket.com/markets?limit=5
    ```
 
 ### API Rate Limits

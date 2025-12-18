@@ -176,7 +176,7 @@ export class PolymarketAPI {
           const size = parseFloat(bid.size);
           const price = parseFloat(bid.price);
           const notional = this.calculateNotionalValue(size, price);
-          return notional >= minSize && price >= 0.10 && price <= 0.90;
+          return notional >= minSize && price >= config.minPrice && price <= config.maxPrice;
         })
         .map(bid => ({
           market: market.question,
@@ -192,7 +192,7 @@ export class PolymarketAPI {
           const size = parseFloat(ask.size);
           const price = parseFloat(ask.price);
           const notional = this.calculateNotionalValue(size, price);
-          return notional >= minSize && price >= 0.10 && price <= 0.90;
+          return notional >= minSize && price >= config.minPrice && price <= config.maxPrice;
         })
         .map(ask => ({
           market: market.question,
