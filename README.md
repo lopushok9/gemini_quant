@@ -178,44 +178,27 @@ python3 large_trades.py
 
 ## Polymarket Tools
 
-Monitor large trades and orders on Polymarket prediction markets.
+Monitor large trades and market activity on Polymarket prediction markets in real-time.
 
-### Polymarket Large Trades Monitor
+### Polymarket Whale Monitor (`Poly`)
 
-A TypeScript-based monitoring system that tracks large trades and orders (>$3,000) on Polymarket. It scans top volume markets and analyzes order books to identify significant trading activity.
+A real-time monitoring system powered by WebSockets that tracks large "whale" trades and volume spikes.
 
 #### Features
 
-*   **Real-time Order Book Analysis**: Scans order books for large orders
-*   **Volume Change Detection**: Monitors volume increases across markets
-*   **Top Markets Tracking**: Focuses on highest volume prediction markets
-*   **Configurable Threshold**: Set minimum order size (default: $3,000)
-*   **Rich Console Output**: Detailed market and order information
+*   **Real-time WebSocket Feed**: Instant alerts for executed trades directly from Polymarket's data stream.
+*   **Whale Tracking**: Automatically filters for significant BUY-side entries (default >$1,000).
+*   **Smart Filter**: Focuses on high-conviction trades within the 10%-90% price range, filtering out noise.
+*   **Volume Spike Alerts**: Background monitoring for sudden jumps in market volume.
 
 #### Installation & Run
 
 ```bash
 cd Poly
 npm install
-npm test        # Run a quick test
-npm start       # Start continuous monitoring
-# or
-./run.sh        # Alternative runner script
-./run.sh 5000   # Custom threshold: $5,000
+npm run dev
 ```
 
-**Example Output:**
-```
-🎯 LARGE ORDERS FOUND ON MARKET
-Market:   US recession in 2025?
-Volume:   $10,918,352.82
 
-Large Orders (3):
-🔴 SELL No
-   Size:  300005.05 shares
-   Price: $0.9980
-   Value: $299,405.04
-```
-
-See [Poly/README.md](Poly/README.md) for detailed documentation.
+*Disclaimer: This project is for educational purposes only. Always do your own research (DYOR). Trading and investing involve significant risk.*
 
