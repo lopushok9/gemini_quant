@@ -152,20 +152,31 @@ export class PolymarketAPI {
     const tokenIds = this.parseTokenIds(market);
     const largeOrders: any[] = [];
 
+    let outcomes: string[] = [];
+    if (Array.isArray(market.outcomes)) {
+      outcomes = market.outcomes;
+    } else if (typeof market.outcomes === 'string') {
+      try {
+        outcomes = JSON.parse(market.outcomes);
+      } catch {
+        outcomes = [];
+      }
+    }
+
     for (let i = 0; i < tokenIds.length; i++) {
       const tokenId = tokenIds[i];
       const orderBook = await this.getOrderBook(tokenId);
       
       if (!orderBook) continue;
 
-      const outcome = market.outcomes && market.outcomes[i] ? market.outcomes[i] : `Outcome ${i}`;
+      const outcome = outcomes && outcomes[i] ? outcomes[i] : `Outcome ${i}`;
 
       const largeBids = orderBook.bids
         .filter(bid => {
           const size = parseFloat(bid.size);
           const price = parseFloat(bid.price);
           const notional = this.calculateNotionalValue(size, price);
-          return notional >= minSize;
+          return notional >= minSize && price >= 0.10 && price <= 0.90;
         })
         .map(bid => ({
           market: market.question,
@@ -181,7 +192,7 @@ export class PolymarketAPI {
           const size = parseFloat(ask.size);
           const price = parseFloat(ask.price);
           const notional = this.calculateNotionalValue(size, price);
-          return notional >= minSize;
+          return notional >= minSize && price >= 0.10 && price <= 0.90;
         })
         .map(ask => ({
           market: market.question,
