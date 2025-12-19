@@ -1,14 +1,31 @@
+import os
 import requests
 import feedparser
 import argparse
 import time
 import re
+from urllib.parse import urljoin
 from lxml import etree, html
 from tabulate import tabulate
 
+SEC_USER_AGENT = os.getenv("SEC_USER_AGENT") or os.getenv("USER_AGENT")
+
 HEADERS = {
-    "User-Agent": "InsiderTradingTracker/1.0 your-email@example.com"  # ВАЖНО: Измените email!
+    "User-Agent": SEC_USER_AGENT or "InsiderTradingTracker/1.0 (contact: your-email@example.com)",
+    "Accept-Encoding": "gzip, deflate",
+    "Accept": "application/atom+xml,application/xml,text/xml,text/html;q=0.9,*/*;q=0.8",
 }
+
+_XSL_DIR_RE = re.compile(r"/xslF345X\d{2}/", re.IGNORECASE)
+
+
+def normalize_sec_xml_url(url: str) -> str:
+    """SEC иногда отдаёт HTML-рендеринг XML через xslF345X**/.
+
+    Для парсинга нужно скачивать сырой XML без xsl-директории.
+    """
+
+    return _XSL_DIR_RE.sub("/", url)
 
 def get_recent_form4_rss(count=100):
     """Получить последние Form 4 из RSS feed"""
@@ -57,24 +74,26 @@ def get_xml_url_from_filing(filing_url, debug=False):
             if len(cells) >= 3:
                 # Ячейка с типом документа (обычно 4-я колонка)
                 doc_type = cells[3].text_content().strip() if len(cells) > 3 else ''
+                doc_type_clean = doc_type.strip().upper()
+
                 # Ячейка со ссылкой (обычно 3-я колонка)
                 link_elem = cells[2].xpath('.//a/@href')
-                
+
                 if link_elem:
                     link = link_elem[0]
                     filename = link.split('/')[-1].lower()
-                    
+
                     if debug:
                         print(f"    Found: {filename}, Type: {doc_type}")
-                    
+
                     # Пропускаем XSLT файлы
                     if 'xslf34x' in filename or filename.endswith('.xsd'):
                         continue
-                    
+
                     # Ищем XML файлы
                     if filename.endswith('.xml'):
                         # Приоритет 0: Основной Form 4 XML
-                        if doc_type == '4':
+                        if doc_type_clean.startswith('4'):
                             priority = 0
                         # Приоритет 1: Файлы с form4 или doc4 в имени
                         elif 'form4' in filename or 'doc4' in filename or 'wf-form4' in filename:
@@ -82,8 +101,8 @@ def get_xml_url_from_filing(filing_url, debug=False):
                         # Приоритет 2: Любой другой XML
                         else:
                             priority = 2
-                        
-                        full_url = f"https://www.sec.gov{link}" if link.startswith('/') else link
+
+                        full_url = urljoin('https://www.sec.gov', link)
                         xml_candidates.append((priority, full_url, filename))
         
         # Сортируем по приоритету и возвращаем первый
@@ -102,55 +121,73 @@ def get_xml_url_from_filing(filing_url, debug=False):
 
 
 def fetch_and_parse_xml(xml_url, debug=False):
-    """Скачать и распарсить XML"""
+    """Скачать и распарсить XML.
+
+    SEC часто отдаёт HTML-представление XML, если ссылка содержит xslF345X**/.
+    В таком случае нужно скачать "сырой" XML без этой директории.
+    """
+
     time.sleep(0.11)
-    
-    try:
-        response = requests.get(xml_url, headers=HEADERS, timeout=15)
-        response.raise_for_status()
-        
-        content = response.content
-        
-        # Проверяем, что это действительно XML, а не HTML
+
+    candidate_urls = []
+    raw_url = normalize_sec_xml_url(xml_url)
+    if raw_url != xml_url:
+        candidate_urls.append(raw_url)
+    candidate_urls.append(xml_url)
+
+    last_error = None
+
+    for url in candidate_urls:
         try:
-            # Пробуем декодировать первые 500 байт
+            response = requests.get(url, headers=HEADERS, timeout=15)
+            response.raise_for_status()
+
+            content = response.content
+            content_type = (response.headers.get('content-type') or '').lower()
+
             text_sample = content[:500].decode('utf-8', errors='ignore').strip().lower()
-            
+
             if debug:
+                if url != xml_url:
+                    print(f"    Trying raw XML URL: {url}")
+                print(f"    Content-Type: {content_type or '(unknown)'}")
                 print(f"    Content starts: {text_sample[:100]}")
-            
-            # Если явно HTML
-            if text_sample.startswith(('<!doctype html', '<html')):
+
+            is_html = (
+                'text/html' in content_type
+                or text_sample.startswith(('<!doctype html', '<html'))
+            )
+
+            if is_html:
                 if debug:
                     print("    -> HTML detected")
-                return None
-            
-            # Если это XML (либо есть декларация, либо начинается с тега XML)
-            if '<?xml' in text_sample or text_sample.startswith('<xml') or '<ownershipdocument>' in text_sample:
+                continue
+
+            if '<?xml' in text_sample or '<ownershipdocument>' in text_sample:
                 if debug:
                     print("    -> Valid XML")
                 return content
-            
-            # Пробуем парсить как XML для проверки
+
             try:
                 etree.fromstring(content)
                 if debug:
                     print("    -> Parseable XML")
                 return content
-            except:
+            except Exception:
                 if debug:
                     print("    -> Not parseable as XML")
-                return None
-            
-        except:
+                continue
+
+        except Exception as e:
+            last_error = e
             if debug:
-                print("    -> Decode error")
-            return None
-        
-    except Exception as e:
-        if debug:
-            print(f"    Fetch error: {e}")
-        return None
+                print(f"    Fetch error ({url}): {e}")
+            continue
+
+    if debug and last_error:
+        print(f"    -> Failed to fetch XML: {last_error}")
+
+    return None
 
 
 def safe_xpath_text(element, xpath, default=''):
