@@ -363,7 +363,7 @@ def format_transaction_code(code, is_derivative=False):
     return result
 
 
-def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False):
+def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_buysell=False):
     """Главная функция"""
     print("=" * 90)
     print("SEC Form 4 Insider Trading Tracker")
@@ -426,6 +426,9 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False):
             
             if not show_derivatives:
                 transactions = [t for t in transactions if not t['derivative']]
+            
+            if only_buysell:
+                transactions = [t for t in transactions if t['code'] in ('P', 'S')]
             
             if transactions:
                 print(f"✓ {len(transactions)} сделок")
@@ -521,6 +524,7 @@ if __name__ == "__main__":
   python sec_form4_scraper.py --limit 100              # Обработать 100 форм
   python sec_form4_scraper.py --ticker NVDA --limit 200
   python sec_form4_scraper.py --no-derivatives         # Без деривативов
+  python sec_form4_scraper.py --only-buysell           # Только покупки и продажи (P/S)
         '''
     )
     
@@ -549,6 +553,12 @@ if __name__ == "__main__":
         action='store_true'
     )
     
+    parser.add_argument(
+        '--only-buysell',
+        help='Отображать только покупки (P) и продажи (S)',
+        action='store_true'
+    )
+    
     args = parser.parse_args()
     
     try:
@@ -556,7 +566,8 @@ if __name__ == "__main__":
             ticker_filter=args.ticker, 
             limit=args.limit,
             show_derivatives=not args.no_derivatives,
-            debug=args.debug
+            debug=args.debug,
+            only_buysell=args.only_buysell
         )
     except KeyboardInterrupt:
         print("\n\n⚠ Прервано пользователем")
