@@ -105,11 +105,15 @@ export class TradeMonitor {
       const market = this.api.getMarketByConditionId(payload.conditionId);
 
       if (market) {
-        this.displayTrade(market, payload, notional);
+        if (market.active && !market.closed && !market.archived) {
+          this.displayTrade(market, payload, notional);
+        }
       } else {
         // If market not in cache, try to fetch it and then display
         this.api.getMarket(payload.conditionId).then(m => {
-          if (m) this.displayTrade(m, payload, notional);
+          if (m && m.active && !m.closed && !m.archived) {
+            this.displayTrade(m, payload, notional);
+          }
         });
       }
     }
@@ -154,9 +158,10 @@ export class TradeMonitor {
     // 2. Start WebSocket connection
     this.connectToWebSocket();
 
-    // 3. Periodic volume scanning (optional, keeping it as background task)
-    this.startVolumeMonitoring();
+    // 3. Periodic volume scanning (disabled as per user request to focus on individual trades)
+    // this.startVolumeMonitoring();
   }
+
 
   private startVolumeMonitoring(): void {
     const volumeInterval = setInterval(async () => {
