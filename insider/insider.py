@@ -477,7 +477,6 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False):
             owned_str = t['owned']
         
         table_data.append([
-            t['filing_date'],
             t['trade_date'],
             t['ticker'][:8],
             t['company'][:22],
@@ -491,7 +490,6 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False):
         ])
     
     headers = [
-        "Filing",
         "Trade",
         "Ticker",
         "Company",
@@ -504,7 +502,7 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False):
         "Value"
     ]
     
-    print(tabulate(table_data, headers=headers, tablefmt="grid", maxcolwidths=[10, 10, 8, 22, 18, 15, 10, 12, 12, 3, 12]))
+    print(tabulate(table_data, headers=headers, tablefmt="grid", maxcolwidths=[10, 8, 22, 18, 15, 10, 12, 12, 3, 12]))
     
     print("\n" + "=" * 90)
     print("Коды: P=Purchase (Покупка), S=Sale (Продажа), A=Award (Грант), M=Exercise (Исполнение опциона)")
