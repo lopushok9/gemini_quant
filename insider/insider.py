@@ -20,19 +20,19 @@ _XSL_DIR_RE = re.compile(r"/xslF345X\d{2}/", re.IGNORECASE)
 
 
 def normalize_sec_xml_url(url: str) -> str:
-    """SEC иногда отдаёт HTML-рендеринг XML через xslF345X**/.
+    """SEC sometimes returns HTML-rendered XML via xslF345X**/.
 
-    Для парсинга нужно скачивать сырой XML без xsl-директории.
+    To parse properly, we need to download the raw XML without the xsl directory.
     """
 
     return _XSL_DIR_RE.sub("/", url)
 
 def get_recent_form4_rss(count=100):
-    """Получить последние Form 4 из RSS feed"""
+    """Fetch the latest Form 4 filings from the SEC RSS feed"""
     url = f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&owner=only&count={count}&output=atom"
     
-    print(f"Получение RSS feed с {count} последними Form 4...")
-    time.sleep(0.11)  # SEC требует не более 10 запросов в секунду
+    print(f"Fetching RSS feed with the {count} latest Form 4 filings...")
+    time.sleep(0.11)  # SEC allows no more than 10 requests per second
     
     try:
         response = requests.get(url, headers=HEADERS, timeout=15)
@@ -47,36 +47,36 @@ def get_recent_form4_rss(count=100):
                 'updated': entry.updated if hasattr(entry, 'updated') else ''
             })
         
-        print(f"Найдено {len(entries)} форм")
+        print(f"Found {len(entries)} filings")
         return entries
     
     except Exception as e:
-        print(f"Ошибка получения RSS: {e}")
+        print(f"Error fetching RSS: {e}")
         return []
 
 
 def get_xml_url_from_filing(filing_url, debug=False):
-    """Получить URL основного XML файла Form 4 из страницы filing"""
+    """Extract the main Form 4 XML file URL from the filing landing page"""
     time.sleep(0.11)
     
     try:
         response = requests.get(filing_url, headers=HEADERS, timeout=15)
         response.raise_for_status()
         
-        # Парсим HTML страницу
+        # Parse the HTML page
         tree = html.fromstring(response.content)
         
-        # Ищем таблицу с документами
+        # Look for the document table
         xml_candidates = []
         
         for row in tree.xpath('//table[@class="tableFile"]//tr'):
             cells = row.xpath('.//td')
             if len(cells) >= 3:
-                # Ячейка с типом документа (обычно 4-я колонка)
+                # Document type cell (usually 4th column)
                 doc_type = cells[3].text_content().strip() if len(cells) > 3 else ''
                 doc_type_clean = doc_type.strip().upper()
 
-                # Ячейка со ссылкой (обычно 3-я колонка)
+                # Document link cell (usually 3rd column)
                 link_elem = cells[2].xpath('.//a/@href')
 
                 if link_elem:
@@ -86,26 +86,26 @@ def get_xml_url_from_filing(filing_url, debug=False):
                     if debug:
                         print(f"    Found: {filename}, Type: {doc_type}")
 
-                    # Пропускаем XSLT файлы
+                    # Skip XSLT and schema files
                     if 'xslf34x' in filename or filename.endswith('.xsd'):
                         continue
 
-                    # Ищем XML файлы
+                    # Look for XML files
                     if filename.endswith('.xml'):
-                        # Приоритет 0: Основной Form 4 XML
+                        # Priority 0: Main Form 4 XML
                         if doc_type_clean.startswith('4'):
                             priority = 0
-                        # Приоритет 1: Файлы с form4 или doc4 в имени
+                        # Priority 1: Files with form4 or doc4 in the name
                         elif 'form4' in filename or 'doc4' in filename or 'wf-form4' in filename:
                             priority = 1
-                        # Приоритет 2: Любой другой XML
+                        # Priority 2: Any other XML
                         else:
                             priority = 2
 
                         full_url = urljoin('https://www.sec.gov', link)
                         xml_candidates.append((priority, full_url, filename))
         
-        # Сортируем по приоритету и возвращаем первый
+        # Sort by priority and return the best match
         if xml_candidates:
             xml_candidates.sort(key=lambda x: x[0])
             if debug:
@@ -121,10 +121,10 @@ def get_xml_url_from_filing(filing_url, debug=False):
 
 
 def fetch_and_parse_xml(xml_url, debug=False):
-    """Скачать и распарсить XML.
+    """Download and validate XML content.
 
-    SEC часто отдаёт HTML-представление XML, если ссылка содержит xslF345X**/.
-    В таком случае нужно скачать "сырой" XML без этой директории.
+    SEC often returns an HTML view of the XML if the URL contains xslF345X**/.
+    In such cases, we fetch the "raw" XML by removing that directory.
     """
 
     time.sleep(0.11)
@@ -191,7 +191,7 @@ def fetch_and_parse_xml(xml_url, debug=False):
 
 
 def safe_xpath_text(element, xpath, default=''):
-    """Безопасное извлечение текста по XPath"""
+    """Safely extract text using XPath"""
     try:
         result = element.xpath(xpath)
         if result and len(result) > 0:
@@ -205,18 +205,18 @@ def safe_xpath_text(element, xpath, default=''):
 
 
 def parse_form4_xml(xml_data):
-    """Парсинг Form 4 XML в структурированные данные"""
+    """Parse Form 4 XML into structured data"""
     try:
-        # Очистка XML от возможных проблемных символов
+        # Clean XML from potential problematic characters
         xml_str = xml_data.decode('utf-8', errors='ignore')
         
-        # Удаляем BOM если есть
+        # Remove BOM if present
         if xml_str.startswith('\ufeff'):
             xml_str = xml_str[1:]
         
         root = etree.fromstring(xml_str.encode('utf-8'))
         
-        # Базовая информация - пробуем разные пути
+        # Base information - trying multiple paths for robustness
         issuer_name = (
             safe_xpath_text(root, './/issuerName') or 
             safe_xpath_text(root, './/issuer/issuerName') or
@@ -242,7 +242,7 @@ def parse_form4_xml(xml_data):
         
         transactions = []
         
-        # Non-derivative транзакции
+        # Non-derivative transactions
         for tx in root.xpath('.//nonDerivativeTransaction'):
             try:
                 trade_date = safe_xpath_text(tx, './/transactionDate/value')
@@ -251,20 +251,20 @@ def parse_form4_xml(xml_data):
                 price = safe_xpath_text(tx, './/transactionPricePerShare/value', '0')
                 owned = safe_xpath_text(tx, './/sharesOwnedFollowingTransaction/value', '0')
                 
-                # Ownership может быть в разных местах
+                # Ownership structure can vary
                 ownership = (
                     safe_xpath_text(tx, './/ownershipNature/directOrIndirectOwnership/value') or
                     safe_xpath_text(tx, './/directOrIndirectOwnership/value') or
                     'D'
                 )
                 
-                # Вычисляем стоимость
+                # Calculate value
                 try:
                     value = float(price) * float(shares)
                 except:
                     value = 0
                 
-                if trade_date and code:  # Минимальные требования
+                if trade_date and code:  # Minimum requirements
                     transactions.append({
                         'filing_date': filing_date,
                         'trade_date': trade_date,
@@ -283,14 +283,14 @@ def parse_form4_xml(xml_data):
             except Exception as e:
                 continue
         
-        # Derivative транзакции
+        # Derivative transactions
         for tx in root.xpath('.//derivativeTransaction'):
             try:
                 trade_date = safe_xpath_text(tx, './/transactionDate/value')
                 code = safe_xpath_text(tx, './/transactionCoding/transactionCode')
                 shares = safe_xpath_text(tx, './/transactionShares/value', '0')
                 
-                # Для derivative может быть другая цена
+                # Derivative might have a different price field
                 price = (
                     safe_xpath_text(tx, './/conversionOrExercisePrice/value', '0') or
                     safe_xpath_text(tx, './/transactionPricePerShare/value', '0')
@@ -331,12 +331,12 @@ def parse_form4_xml(xml_data):
         return transactions
     
     except Exception as e:
-        print(f"Ошибка парсинга XML: {e}")
+        print(f"Error parsing XML: {e}")
         return []
 
 
 def format_transaction_code(code, is_derivative=False):
-    """Расшифровка кода транзакции"""
+    """Decode transaction codes into human-readable strings"""
     codes = {
         'P': 'Purchase',
         'S': 'Sale',
@@ -364,30 +364,30 @@ def format_transaction_code(code, is_derivative=False):
 
 
 def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_buysell=False):
-    """Главная функция"""
+    """Main execution function"""
     print("=" * 90)
     print("SEC Form 4 Insider Trading Tracker")
     print("=" * 90)
     
     if ticker_filter:
-        print(f"Фильтр по тикеру: {ticker_filter.upper()}")
+        print(f"Ticker filter: {ticker_filter.upper()}")
     if debug:
         print("⚙ Debug mode enabled")
     
     print()
     
-    # Получаем RSS feed
+    # Fetch RSS feed
     entries = get_recent_form4_rss(count=limit)
     
     if not entries:
-        print("Не удалось получить данные из RSS feed")
+        print("Failed to retrieve data from the RSS feed")
         return
     
     all_transactions = []
     processed = 0
     errors = 0
     
-    print(f"\nОбработка {len(entries)} форм...")
+    print(f"\nProcessing {len(entries)} filings...")
     print()
     
     for idx, entry in enumerate(entries, 1):
@@ -397,30 +397,30 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_
         if debug:
             print(f"\n  Filing URL: {entry['link']}")
         
-        # Получаем XML URL
+        # Get XML URL
         xml_url = get_xml_url_from_filing(entry['link'], debug=debug)
         
         if not xml_url:
-            print("❌ XML не найден")
+            print("❌ XML not found")
             errors += 1
             continue
         
         if debug:
             print(f"  XML URL: {xml_url}")
         
-        # Скачиваем XML
+        # Download XML
         xml_data = fetch_and_parse_xml(xml_url, debug=debug)
         
         if not xml_data:
-            print("⚠ Неверный формат")
+            print("⚠ Invalid format")
             errors += 1
             continue
         
-        # Парсим транзакции
+        # Parse transactions
         transactions = parse_form4_xml(xml_data)
         
         if transactions:
-            # Фильтрация
+            # Filtering
             if ticker_filter:
                 transactions = [t for t in transactions if t['ticker'].upper() == ticker_filter.upper()]
             
@@ -431,28 +431,28 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_
                 transactions = [t for t in transactions if t['code'] in ('P', 'S')]
             
             if transactions:
-                print(f"✓ {len(transactions)} сделок")
+                print(f"✓ {len(transactions)} trades")
                 all_transactions.extend(transactions)
                 processed += 1
             else:
-                print("⊘ Отфильтровано")
+                print("⊘ Filtered out")
         else:
-            print("⚠ Нет данных")
+            print("⚠ No data")
     
     print()
     print("=" * 90)
-    print(f"Обработано: {processed} форм | Ошибок: {errors} | Найдено сделок: {len(all_transactions)}")
+    print(f"Processed: {processed} filings | Errors: {errors} | Trades found: {len(all_transactions)}")
     print("=" * 90)
     
     if not all_transactions:
-        print("\n❌ Инсайдерские сделки не найдены")
+        print("\n❌ No insider trades found matching your criteria")
         if ticker_filter:
-            print(f"Попробуйте другой тикер или запустите без фильтра")
+            print(f"Try another ticker or run without filters")
         return
     
     print()
     
-    # Форматируем для вывода
+    # Format for output
     table_data = []
     for t in all_transactions:
         try:
@@ -508,54 +508,54 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_
     print(tabulate(table_data, headers=headers, tablefmt="grid", maxcolwidths=[10, 8, 22, 18, 15, 10, 12, 12, 3, 12]))
     
     print("\n" + "=" * 90)
-    print("Коды: P=Purchase (Покупка), S=Sale (Продажа), A=Award (Грант), M=Exercise (Исполнение опциона)")
-    print("D/I: D=Direct (Прямое владение), I=Indirect (Косвенное) | (Deriv)=Derivative Security")
+    print("Codes: P=Purchase, S=Sale, A=Award, M=Exercise")
+    print("D/I: D=Direct, I=Indirect | (Deriv)=Derivative Security")
     print("=" * 90)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Отслеживание инсайдерских сделок SEC Form 4',
+        description='SEC Form 4 Insider Trading Tracker',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
-Примеры использования:
-  python sec_form4_scraper.py                          # Последние 40 сделок
-  python sec_form4_scraper.py --ticker AAPL            # Только AAPL
-  python sec_form4_scraper.py --limit 100              # Обработать 100 форм
-  python sec_form4_scraper.py --ticker NVDA --limit 200
-  python sec_form4_scraper.py --no-derivatives         # Без деривативов
-  python sec_form4_scraper.py --only-buysell           # Только покупки и продажи (P/S)
+Examples:
+  python insider.py                          # Latest 40 filings
+  python insider.py --ticker AAPL            # Filter by AAPL
+  python insider.py --limit 100              # Process 100 filings
+  python insider.py --ticker NVDA --limit 200
+  python insider.py --no-derivatives         # Hide derivatives
+  python insider.py --only-buysell           # Only Purchases and Sales (P/S)
         '''
     )
     
     parser.add_argument(
         '--ticker', 
-        help='Фильтр по тикеру (например: AAPL, TSLA, MSFT)',
+        help='Ticker filter (e.g., AAPL, TSLA, MSFT)',
         type=str
     )
     
     parser.add_argument(
         '--limit',
-        help='Количество форм для обработки (по умолчанию: 40)',
+        help='Number of filings to process (default: 40)',
         type=int,
         default=40
     )
     
     parser.add_argument(
         '--no-derivatives',
-        help='Скрыть derivative транзакции (опционы и т.д.)',
+        help='Hide derivative transactions (options, etc.)',
         action='store_true'
     )
     
     parser.add_argument(
         '--debug',
-        help='Включить режим отладки',
+        help='Enable debug mode',
         action='store_true'
     )
     
     parser.add_argument(
         '--only-buysell',
-        help='Отображать только покупки (P) и продажи (S)',
+        help='Display only Purchases (P) and Sales (S)',
         action='store_true'
     )
     
@@ -570,8 +570,8 @@ if __name__ == "__main__":
             only_buysell=args.only_buysell
         )
     except KeyboardInterrupt:
-        print("\n\n⚠ Прервано пользователем")
+        print("\n\n⚠ Interrupted by user")
     except Exception as e:
-        print(f"\n❌ Критическая ошибка: {e}")
+        print(f"\n❌ Critical error: {e}")
         import traceback
         traceback.print_exc()
