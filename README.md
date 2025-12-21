@@ -199,6 +199,25 @@ npm install
 npm run dev
 ```
 
+---
+
+## SEC Insider Trading Tracker
+
+Real-time monitoring of SEC Form 4 filings to track executive buying and selling activity.
+
+### Features
+
+- **Live Tracking**: Fetches the latest filings directly from the SEC EDGAR RSS feed.
+- **Advanced Filtering**: Filter by ticker (`--ticker`), limit results, or focus only on open market buys/sells.
+- **Full Transparency**: Extracts exact trade dates, prices, shares, and total transaction values.
+
+### Installation & Run
+
+```bash
+cd insider
+pip install requests feedparser lxml tabulate
+python3 insider.py --ticker AAPL --only-buysell
+```
 
 *Disclaimer: This project is for educational purposes only. Always do your own research (DYOR). Trading and investing involve significant risk.*
 
