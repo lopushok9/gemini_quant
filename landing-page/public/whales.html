@@ -13,14 +13,16 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <!-- Ionicons -->
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </head>
 
-<body style="font-family: 'Inter', sans-serif;">
+<body>
 
     <nav class="navbar">
         <div class="logo" style="color: #4a90e2;"><a href="/">Quanty</a></div>
@@ -38,7 +40,7 @@
     <main class="whales-page-container">
         <header class="whales-header">
             <h1 style="font-family: 'Inter', sans-serif;">Poly Whales</h1>
-            <p style="font-family: 'Inter', sans-serif;">Real-time large positions from Polymarket</p>
+            <p style="font-family: 'Inter', sans-serif;">Real-time large positions from Polymarket </p>
         </header>
 
         <div class="whales-filters">
@@ -65,10 +67,13 @@
                 <label for="probFilter" class="filter-label">Probability:</label>
                 <select id="probFilter" class="filter-select">
                     <option value="all">All Prices</option>
-                    <option value="4-94">4% - 94%</option>
-                    <option value="10-90">10% - 90%</option>
-                    <option value="30-70">30% - 70%</option>
+                    <option value="middle">10% - 90% (Whales)</option>
                 </select>
+            </div>
+
+            <div class="filter-group search-group">
+                <label for="marketSearch" class="filter-label">Search Market:</label>
+                <input type="text" id="marketSearch" class="filter-input" placeholder="Search (e.g. Bitcoin)...">
             </div>
         </div>
 
@@ -98,41 +103,10 @@
         let currentMinSize = 1000;
         let currentOutcome = 'all';
         let currentProbMode = 'all';
+        let currentSearch = '';
 
         const feedContainer = document.getElementById('whalesFeed');
         const marketCache = new Map();
-        const processedTradeIds = new Set();
-
-        function getTradeKey(t) {
-            const rawIdx = t.timestamp || t.time;
-            let ms = 0;
-
-            if (rawIdx) {
-                if (typeof rawIdx === 'number') {
-                    // Assume seconds if small, ms if large
-                    ms = rawIdx < 10000000000 ? rawIdx * 1000 : rawIdx;
-                } else if (!isNaN(rawIdx)) {
-                    // String number
-                    const v = parseFloat(rawIdx);
-                    ms = v < 10000000000 ? v * 1000 : v;
-                } else {
-                    // ISO String
-                    ms = new Date(rawIdx).getTime();
-                }
-            }
-            // Fallback to integer seconds
-            const sec = Math.floor(ms / 1000);
-
-            const wallet = (t.proxyWallet || t.proxy_wallet || 'Unknown').toLowerCase();
-            const condition = (t.conditionId || t.condition_id || 'Unknown');
-            const size = parseFloat(t.size).toFixed(0);
-            const price = parseFloat(t.price).toFixed(3);
-
-            const key = `${sec}-${wallet}-${condition}-${size}-${price}`;
-            // Console check for debugging key consistency
-            // console.log('Key:', key, 'RawTS:', rawIdx);
-            return key;
-        }
 
         function removeLoadingState() {
             const ls = document.getElementById('loadingState');
@@ -194,7 +168,7 @@
                         </div>
                     </div>
                     <div class="whale-wallet-info">
-                        <span class="whale-stat-label">Wallet:</span>
+                        <span class="whale-stat-label" style="display: block; margin-right: 8px;">Wallet:</span>
                         <div class="whale-wallet-address" onclick="copyToClipboard('${addr}', this)" title="Click to copy">
                             ${shortAddr}
                         </div>
@@ -238,10 +212,6 @@
                     if (msg.topic !== 'activity' || msg.type !== 'trades' || !msg.payload) return;
 
                     const trade = msg.payload;
-
-                    const key = getTradeKey(trade);
-                    if (processedTradeIds.has(key)) return;
-
                     const price = parseFloat(trade.price);
                     const notional = parseFloat(trade.size) * price;
                     const outcome = (trade.outcome || '').toLowerCase();
@@ -251,20 +221,17 @@
                     // Check all filters
                     const matchesSize = notional >= currentMinSize;
                     const matchesOutcome = currentOutcome === 'all' || outcome === currentOutcome;
-                    let matchesProb = true;
-                    if (currentProbMode === '4-94') matchesProb = (price >= 0.04 && price <= 0.94);
-                    else if (currentProbMode === '10-90') matchesProb = (price >= 0.10 && price <= 0.90);
-                    else if (currentProbMode === '30-70') matchesProb = (price >= 0.30 && price <= 0.70);
+                    const matchesProb = currentProbMode === 'all' || (price >= 0.10 && price <= 0.90);
 
                     if (side === 'BUY' && matchesSize && matchesOutcome && matchesProb && conditionId) {
                         const market = await fetchMarketDetails(conditionId);
 
-                        // Only show if market is still open/active
-                        if (market && !market.closed) {
-                            processedTradeIds.add(key);
+                        // Search filter
+                        const matchesSearch = !currentSearch || market?.question.toLowerCase().includes(currentSearch);
+
+                        // Only show if market is still open/active and matches search
+                        if (market && !market.closed && matchesSearch) {
                             removeLoadingState();
-                            const noTradesMsg = document.getElementById('noTradesMsg');
-                            if (noTradesMsg) noTradesMsg.remove();
 
                             const formattedTrade = {
                                 ...trade,
@@ -305,9 +272,10 @@
             try {
                 console.log(`[Whales] Loading history (Min: $${currentMinSize}, Prob: ${currentProbMode})`);
                 const response = await fetch('/api/proxy/whales');
-                if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Proxy error: ${response.status}`);
+                }
                 const trades = await response.json();
-                console.log(`[Whales] History fetched: ${trades.length} items`);
 
                 if (loadId !== lastLoadId) return;
 
@@ -316,17 +284,12 @@
                 feedContainer.innerHTML = '';
 
                 let count = 0;
-                let checkedCount = 0;
                 const tradesToProcess = Array.isArray(trades) ? trades : [];
 
+                // Process newest first (API returns newest first)
                 for (const t of tradesToProcess) {
-                    checkedCount++;
-                    if (count >= 50) break;
+                    if (count >= 3) break;
                     if (loadId !== lastLoadId) return;
-
-                    // Deduplication for history
-                    const tKey = getTradeKey(t);
-                    if (processedTradeIds.has(tKey)) continue;
 
                     const price = parseFloat(t.price);
                     const size = parseFloat(t.size);
@@ -337,19 +300,17 @@
 
                     const matchesSize = notional >= currentMinSize;
                     const matchesOutcome = currentOutcome === 'all' || outcomeStr === currentOutcome;
+                    const matchesProb = currentProbMode === 'all' || (price >= 0.10 && price <= 0.90);
 
-                    let matchesProb = true;
-                    if (currentProbMode === '4-94') matchesProb = (price >= 0.04 && price <= 0.94);
-                    else if (currentProbMode === '10-90') matchesProb = (price >= 0.10 && price <= 0.90);
-                    else if (currentProbMode === '30-70') matchesProb = (price >= 0.30 && price <= 0.70);
-
-                    // For history, sometimes 'side' is missing, so we allow it if size matches
-                    if ((side === 'BUY' || !side) && matchesSize && matchesOutcome && matchesProb && conditionId) {
+                    if (side === 'BUY' && matchesSize && matchesOutcome && matchesProb && conditionId) {
                         const market = await fetchMarketDetails(conditionId);
+
                         if (loadId !== lastLoadId) return;
 
-                        if (market && !market.closed) {
-                            processedTradeIds.add(tKey);
+                        const question = market?.question || '';
+                        const matchesSearch = !currentSearch || question.toLowerCase().includes(currentSearch);
+
+                        if (market && !market.closed && matchesSearch) {
                             const formattedTrade = {
                                 size: size,
                                 price: price,
@@ -366,10 +327,9 @@
                 }
 
                 if (count === 0 && loadId === lastLoadId) {
-                    console.log(`[Whales] No matches in history (${checkedCount} checked)`);
-                    feedContainer.innerHTML = '<div id="noTradesMsg" style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters in recent history. Waiting for live updates...</p></div>';
+                    feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters in recent history. Waiting for live updates...</p></div>';
                 }
-                console.log(`[Whales] History load finished. Displayed: ${count}`);
+                console.log(`[Whales] History load complete. Shown: ${count}`);
             } catch (err) {
                 if (loadId !== lastLoadId) return;
                 console.error('Error loading initial trades:', err);
@@ -382,12 +342,6 @@
         // Filter handling
         const refreshFeed = () => {
             feedContainer.innerHTML = '';
-            processedTradeIds.clear();
-
-            // Clear any old message manually just in case
-            const oldMsg = document.getElementById('noTradesMsg');
-            if (oldMsg) oldMsg.remove();
-
             feedContainer.appendChild(createLoadingElement());
             loadInitialTrades();
         };
@@ -407,17 +361,12 @@
             refreshFeed();
         });
 
-        function createLoadingElement() {
-            const div = document.createElement('div');
-            div.id = 'loadingState';
-            div.style = 'text-align: center; color: #999; padding: 2rem;';
-            div.innerHTML = '<p>Loading history...</p>';
-            return div;
-        }
-
-        // Execution
-        loadInitialTrades();
-        connectWS();
+        let searchTimeout;
+        document.getElementById('marketSearch').addEventListener('input', (e) => {
+            currentSearch = e.target.value.toLowerCase().trim();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(refreshFeed, 500); // 500ms debounce
+        });
 
         function createLoadingElement() {
             const div = document.createElement('div');

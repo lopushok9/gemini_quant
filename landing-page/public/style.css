@@ -293,6 +293,45 @@ a:hover {
     font-size: 0.95rem;
 }
 
+/* Подключение Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+.filter-group.search-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+}
+
+.filter-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    /* нейтральный серый */
+}
+
+.filter-input {
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background-color: #ffffff;
+    color: #111827;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.filter-input::placeholder {
+    color: #9ca3af;
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: #111827;
+    box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.08);
+}
+
+
 /* Hero Section */
 .hero-section {
     text-align: center;
