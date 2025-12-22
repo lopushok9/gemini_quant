@@ -253,6 +253,34 @@ OUTPUT FORMAT - Generate analysis using this EXACT structure:
 *DISCLAIMER: This analysis is for educational purposes only. Not financial advice. DYOR.*`
 };
 
+// Proxy for Polymarket API (to avoid CORS)
+app.get('/api/proxy/whales', async (req, res) => {
+    try {
+        const response = await fetch('https://data-api.polymarket.com/trades?limit=1500');
+        if (!response.ok) throw new Error(`Polymarket API error: ${response.status}`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Proxy error:', error);
+        res.status(500).json({ error: 'Failed to fetch trades from Polymarket' });
+    }
+});
+
+app.get('/api/proxy/markets', async (req, res) => {
+    try {
+        const conditionId = req.query.condition_id;
+        if (!conditionId) return res.status(400).json({ error: 'condition_id is required' });
+
+        const response = await fetch(`https://gamma-api.polymarket.com/markets?conditionId=${conditionId}`);
+        if (!response.ok) throw new Error(`Polymarket API error: ${response.status}`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Proxy error (markets):', error);
+        res.status(500).json({ error: 'Failed to fetch market from Polymarket' });
+    }
+});
+
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -268,6 +296,10 @@ app.get('/terms', (req, res) => {
 
 app.get('/how-to-use', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'how-to-use.html'));
+});
+
+app.get('/whales', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'whales.html'));
 });
 
 app.get('/chat', (req, res) => {
