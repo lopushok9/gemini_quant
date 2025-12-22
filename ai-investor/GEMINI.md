@@ -87,3 +87,4 @@ Provide specific position sizing recommendations
 Include both bullish and bearish scenarios
 Use parallel web searches for comprehensive data gathering
 Format all tables and sections consistently
+Do not use markdown formatting "**"
