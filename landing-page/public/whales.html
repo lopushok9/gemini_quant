@@ -101,6 +101,38 @@
 
         const feedContainer = document.getElementById('whalesFeed');
         const marketCache = new Map();
+        const processedTradeIds = new Set();
+
+        function getTradeKey(t) {
+            const rawIdx = t.timestamp || t.time;
+            let ms = 0;
+
+            if (rawIdx) {
+                if (typeof rawIdx === 'number') {
+                    // Assume seconds if small, ms if large
+                    ms = rawIdx < 10000000000 ? rawIdx * 1000 : rawIdx;
+                } else if (!isNaN(rawIdx)) {
+                    // String number
+                    const v = parseFloat(rawIdx);
+                    ms = v < 10000000000 ? v * 1000 : v;
+                } else {
+                    // ISO String
+                    ms = new Date(rawIdx).getTime();
+                }
+            }
+            // Fallback to integer seconds
+            const sec = Math.floor(ms / 1000);
+
+            const wallet = (t.proxyWallet || t.proxy_wallet || 'Unknown').toLowerCase();
+            const condition = (t.conditionId || t.condition_id || 'Unknown');
+            const size = parseFloat(t.size).toFixed(0);
+            const price = parseFloat(t.price).toFixed(3);
+
+            const key = `${sec}-${wallet}-${condition}-${size}-${price}`;
+            // Console check for debugging key consistency
+            // console.log('Key:', key, 'RawTS:', rawIdx);
+            return key;
+        }
 
         function removeLoadingState() {
             const ls = document.getElementById('loadingState');
@@ -206,6 +238,10 @@
                     if (msg.topic !== 'activity' || msg.type !== 'trades' || !msg.payload) return;
 
                     const trade = msg.payload;
+
+                    const key = getTradeKey(trade);
+                    if (processedTradeIds.has(key)) return;
+
                     const price = parseFloat(trade.price);
                     const notional = parseFloat(trade.size) * price;
                     const outcome = (trade.outcome || '').toLowerCase();
@@ -225,6 +261,7 @@
 
                         // Only show if market is still open/active
                         if (market && !market.closed) {
+                            processedTradeIds.add(key);
                             removeLoadingState();
                             const noTradesMsg = document.getElementById('noTradesMsg');
                             if (noTradesMsg) noTradesMsg.remove();
@@ -287,6 +324,10 @@
                     if (count >= 50) break;
                     if (loadId !== lastLoadId) return;
 
+                    // Deduplication for history
+                    const tKey = getTradeKey(t);
+                    if (processedTradeIds.has(tKey)) continue;
+
                     const price = parseFloat(t.price);
                     const size = parseFloat(t.size);
                     const notional = price * size;
@@ -308,6 +349,7 @@
                         if (loadId !== lastLoadId) return;
 
                         if (market && !market.closed) {
+                            processedTradeIds.add(tKey);
                             const formattedTrade = {
                                 size: size,
                                 price: price,
@@ -340,6 +382,8 @@
         // Filter handling
         const refreshFeed = () => {
             feedContainer.innerHTML = '';
+            processedTradeIds.clear();
+
             // Clear any old message manually just in case
             const oldMsg = document.getElementById('noTradesMsg');
             if (oldMsg) oldMsg.remove();
