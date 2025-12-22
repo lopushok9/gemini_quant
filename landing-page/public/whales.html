@@ -226,6 +226,8 @@
                         // Only show if market is still open/active
                         if (market && !market.closed) {
                             removeLoadingState();
+                            const noTradesMsg = document.getElementById('noTradesMsg');
+                            if (noTradesMsg) noTradesMsg.remove();
 
                             const formattedTrade = {
                                 ...trade,
@@ -323,7 +325,7 @@
 
                 if (count === 0 && loadId === lastLoadId) {
                     console.log(`[Whales] No matches in history (${checkedCount} checked)`);
-                    feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters in recent history. Waiting for live updates...</p></div>';
+                    feedContainer.innerHTML = '<div id="noTradesMsg" style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters in recent history. Waiting for live updates...</p></div>';
                 }
                 console.log(`[Whales] History load finished. Displayed: ${count}`);
             } catch (err) {
@@ -338,6 +340,10 @@
         // Filter handling
         const refreshFeed = () => {
             feedContainer.innerHTML = '';
+            // Clear any old message manually just in case
+            const oldMsg = document.getElementById('noTradesMsg');
+            if (oldMsg) oldMsg.remove();
+
             feedContainer.appendChild(createLoadingElement());
             loadInitialTrades();
         };
