@@ -2,10 +2,6 @@
     "cleanUrls": true,
     "rewrites": [
         {
-            "source": "/api/insider",
-            "destination": "/api/insider_feed.py"
-        },
-        {
             "source": "/(.*)",
             "destination": "/server.js"
         }

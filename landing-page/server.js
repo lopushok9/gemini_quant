@@ -165,9 +165,16 @@ app.post('/api/auth/login', async (req, res) => {
     } 
 });
 
-app.get('/api/insider', (req, res) => {
-    // На Vercel этот запрос будет перехвачен vercel.json и направлен в api/insider_feed.py
-    res.json(insiderCache.data);
+app.get('/api/insider', async (req, res) => {
+    // On Vercel: use the Node.js serverless function
+    // On Local: use the Node.js handler as well (Python cache optional)
+    try {
+        const { handler: insiderHandler } = require('./api/insider.js');
+        await insiderHandler(req, res);
+    } catch (e) {
+        console.error('[Insider] Error:', e);
+        res.status(500).json({ error: 'Failed to load insider data' });
+    }
 });
 
 app.get('/api/proxy/whales', async (req, res) => {
