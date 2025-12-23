@@ -1,31 +1,18 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-
-// Token Gating Dependencies
-// Token Gating Dependencies
 const jwt = require('jsonwebtoken');
 const bs58 = require('bs58');
 const nacl = require('tweetnacl');
-const cors = require('cors'); // New dependency
+const cors = require('cors');
 const { Connection, PublicKey } = require('@solana/web3.js');
 const { spawn } = require('child_process');
 
 const decode58 = (str) => {
-    // Debug logging
-    if (!decode58.logged) {
-        console.log('BS58 Debug: Typeof:', typeof bs58);
-        console.log('BS58 Debug: Is Decode Function?', typeof bs58.decode);
-        console.log('BS58 Debug: Default Import?', typeof bs58.default);
-        if (bs58.default) console.log('BS58 Debug: Default Decode?', typeof bs58.default.decode);
-        decode58.logged = true;
-    }
-
     if (typeof bs58.decode === 'function') return bs58.decode(str);
     if (bs58.default && typeof bs58.default.decode === 'function') return bs58.default.decode(str);
-    if (typeof bs58 === 'function') return bs58(str); // unlikely fallback
-
-    throw new Error(`bs58.decode is not available. bs58 type: ${typeof bs58}`);
+    if (typeof bs58 === 'function') return bs58(str);
+    throw new Error(`bs58.decode is not available.`);
 };
 
 const app = express();
@@ -34,130 +21,174 @@ const port = 3000;
 // Token Gating Configuration
 const TOKEN_MINT_ADDRESS = process.env.TOKEN_MINT_ADDRESS;
 const MIN_TOKEN_AMOUNT = parseFloat(process.env.MIN_TOKEN_AMOUNT || '0');
-if (!process.env.JWT_SECRET) {
-    console.error('FATAL ERROR: JWT_SECRET is not defined. Server cannot start securely.');
-    process.exit(1);
-}
 const JWT_SECRET = process.env.JWT_SECRET;
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
+if (!JWT_SECRET) {
+    console.error('FATAL ERROR: JWT_SECRET is not defined.');
+    process.exit(1);
+}
+
 const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
 
-// Insider Data Cache and Background Worker
-let insiderCache = {
-    data: [],
-    lastFetch: 0,
-    isUpdating: false
-};
-const INSIDER_UPDATE_INTERVAL = 30 * 60 * 1000; // 30 minutes
+// --- CORS & SECURITY ---
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://www.quantycli.tech',
+    'https://quantycli.tech'
+];
 
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            return callback(new Error('CORS policy violation'), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true
+}));
+
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+
+// --- RATE LIMITER ---
+const USAGE_LIMIT = 3;
+const LIMIT_WINDOW = 24 * 60 * 60 * 1000;
+const requestCounts = new Map();
+
+const rateLimitMiddleware = (req, res, next) => {
+    if (!req.user || !req.user.publicKey) return next();
+    const wallet = req.user.publicKey;
+    const now = Date.now();
+    let userStats = requestCounts.get(wallet);
+
+    if (!userStats || now > userStats.resetTime) {
+        userStats = { count: 0, resetTime: now + LIMIT_WINDOW };
+    }
+
+    if (userStats.count >= USAGE_LIMIT) {
+        const resetHours = ((userStats.resetTime - now) / 1000 / 60 / 60).toFixed(1);
+        return res.status(429).json({ error: `Daily limit reached. Resets in ${resetHours} hrs.` });
+    }
+
+    userStats.count++;
+    requestCounts.set(wallet, userStats);
+    next();
+};
+
+// --- AUTH MIDDLEWARE ---
+async function checkTokenBalance(walletAddress) {
+    try {
+        const pubkey = new PublicKey(walletAddress);
+        const mint = new PublicKey(TOKEN_MINT_ADDRESS);
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, { mint });
+        if (tokenAccounts.value.length === 0) return 0;
+        return tokenAccounts.value.reduce((acc, account) => {
+            return acc + (account.account.data.parsed.info.tokenAmount.uiAmount || 0);
+        }, 0);
+    } catch (error) {
+        console.error('Balance check error:', error);
+        return 0;
+    }
+}
+
+const authMiddleware = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
+// --- INSIDER DATA CACHE ---
+let insiderCache = { data: [], lastFetch: 0, isUpdating: false };
+const INSIDER_UPDATE_INTERVAL = 30 * 60 * 1000;
 const scriptPath = path.join(__dirname, '..', 'insider', 'insider.py');
 
 function updateInsiderData() {
     if (insiderCache.isUpdating) return;
     insiderCache.isUpdating = true;
-    console.log(`[Insider] Starting background update at ${new Date().toISOString()}...`);
+    console.log(`[Insider] Updating data...`);
 
     const pythonProcess = spawn('python3', [scriptPath, '--json', '--limit', '60']);
-
     let dataString = '';
-    let errorString = '';
 
-    pythonProcess.stdout.on('data', (data) => {
-        dataString += data.toString();
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-        errorString += data.toString();
-    });
-
+    pythonProcess.stdout.on('data', (data) => { dataString += data.toString(); });
     pythonProcess.on('close', (code) => {
         insiderCache.isUpdating = false;
-        
-        if (code !== 0) {
-            console.error(`[Insider] Script exited with code ${code}`);
-            console.error(errorString);
-            return;
-        }
-
+        if (code !== 0) return console.error(`[Insider] Script error code ${code}`);
         try {
             const jsonData = JSON.parse(dataString);
-            if (Array.isArray(jsonData) && jsonData.length > 0) {
+            if (Array.isArray(jsonData)) {
                 insiderCache.data = jsonData;
                 insiderCache.lastFetch = Date.now();
-                console.log(`[Insider] Cache updated with ${jsonData.length} records.`);
-            } else {
-                 console.warn('[Insider] Script returned empty data or invalid format.');
+                console.log(`[Insider] Cache updated: ${jsonData.length} records.`);
             }
-        } catch (e) {
-            console.error('[Insider] JSON Parse Error:', e);
-        }
+        } catch (e) { console.error('[Insider] Parse error'); }
     });
 }
 
-// Initial fetch on server start
 updateInsiderData();
-// Schedule background updates
 setInterval(updateInsiderData, INSIDER_UPDATE_INTERVAL);
 
-// Insider Trading API - Returns Cached Data Instantly
+// --- API ENDPOINTS ---
+
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { publicKey, signature, timestamp } = req.body;
+        if (!publicKey || !signature || !timestamp) return res.status(400).json({ error: 'Missing credentials' });
+        if (Math.abs(Date.now() - timestamp) > 5 * 60 * 1000) return res.status(400).json({ error: 'Expired request' });
+
+        const message = new TextEncoder().encode(`Access Quanty AI - Date: ${timestamp}`);
+        const verified = nacl.sign.detached.verify(message, decode58(signature), new PublicKey(publicKey).toBytes());
+        if (!verified) return res.status(401).json({ error: 'Invalid signature' });
+
+        const balance = await checkTokenBalance(publicKey);
+        if (balance < MIN_TOKEN_AMOUNT) {
+            return res.status(403).json({ error: 'Insufficient balance', balance, required: MIN_TOKEN_AMOUNT });
+        }
+
+        const token = jwt.sign({ publicKey }, JWT_SECRET, { expiresIn: '24h' });
+        res.json({ token, success: true, balance });
+    } catch (error) { res.status(500).json({ error: 'Internal error' }); }
+});
+
 app.get('/api/insider', (req, res) => {
-    // If cache is empty and not updating, trigger an update (fallback)
-    if (insiderCache.data.length === 0 && !insiderCache.isUpdating) {
-        updateInsiderData();
-    }
-    
-    // Return what we have (empty array initially, then populated data)
+    if (insiderCache.data.length === 0 && !insiderCache.isUpdating) updateInsiderData();
     res.json(insiderCache.data);
 });
 
+app.get('/api/proxy/whales', async (req, res) => {
+    try {
+        const response = await fetch('https://data-api.polymarket.com/trades?limit=1500');
+        const data = await response.json();
+        res.json(data);
+    } catch (e) { res.status(500).json({ error: 'Proxy error' }); }
+});
+
 // Routes
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')))
+app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'public', 'about.html')))
+app.get('/terms', (req, res) => res.sendFile(path.join(__dirname, 'public', 'terms.html')))
+app.get('/how-to-use', (req, res) => res.sendFile(path.join(__dirname, 'public', 'how-to-use.html')))
+app.get('/whales', (req, res) => res.sendFile(path.join(__dirname, 'public', 'whales.html')))
+app.get('/insider', (req, res) => res.sendFile(path.join(__dirname, 'public', 'insider.html')))
+app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')))
 
-app.get('/about', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'about.html'));
-});
+const PROMPTS = { default: `You are a professional equity research analyst...` };
 
-app.get('/terms', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'terms.html'));
-});
-
-app.get('/how-to-use', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'how-to-use.html'));
-});
-
-app.get('/whales', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'whales.html'));
-});
-
-app.get('/insider', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'insider.html'));
-});
-
-app.get('/chat', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'chat.html'));
-});
-
-// Chat API endpoint with streaming and Auth
 app.post('/api/chat', authMiddleware, rateLimitMiddleware, async (req, res) => {
-    const { message, mode } = req.body;
-
-    if (!message) {
-        return res.status(400).json({ error: 'Message is required' });
-    }
-
-    if (!process.env.OPENROUTER_API_KEY) {
-        return res.status(500).json({ error: 'API key not configured' });
-    }
-
-    const systemPrompt = PROMPTS['default'];
-
-    // Set headers for SSE
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: 'Message required' });
+    
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
     try {
@@ -165,75 +196,34 @@ app.post('/api/chat', authMiddleware, rateLimitMiddleware, async (req, res) => {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://quanty.ai',
-                'X-Title': 'Quanty AI'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 model: 'amazon/nova-2-lite-v1:free:online',
-                messages: [
-                    {
-                        role: 'system',
-                        content: systemPrompt
-                    },
-                    {
-                        role: 'user',
-                        content: message
-                    }
-                ],
+                messages: [{ role: 'system', content: PROMPTS.default }, { role: 'user', content: message }],
                 stream: true
             })
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API error: ${response.status} - ${errorText}`);
-        }
-
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-
+            const lines = decoder.decode(value).split('\n');
             for (const line of lines) {
                 if (line.startsWith('data: ')) {
                     const data = line.slice(6).trim();
-                    if (data === '[DONE]') {
-                        res.write('data: [DONE]\n\n');
-                        continue;
-                    }
-
+                    if (data === '[DONE]') { res.write('data: [DONE]\n\n'); continue; }
                     try {
-                        const parsed = JSON.parse(data);
-                        const content = parsed.choices?.[0]?.delta?.content;
-                        if (content) {
-                            res.write(`data: ${JSON.stringify({ content })}\n\n`);
-                        }
-                    } catch (e) {
-                        // Skip invalid JSON chunks
-                    }
+                        const content = JSON.parse(data).choices?.[0]?.delta?.content;
+                        if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+                    } catch (e) {}
                 }
             }
         }
-
         res.end();
-
-    } catch (error) {
-        console.error('OpenRouter API error:', error);
-        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-        res.end();
-    }
+    } catch (e) { res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`); res.end(); }
 });
 
-if (require.main === module) {
-    app.listen(port, () => {
-        console.log(`Server running at http://localhost:${port}`);
-    });
-}
-
-module.exports = app;
+app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
