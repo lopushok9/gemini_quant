@@ -37,6 +37,7 @@
 
         .insider-table {
             width: 100%;
+            min-width: 1000px;
             border-collapse: collapse;
             font-family: 'DM Sans', sans-serif;
             font-size: 0.9rem;
@@ -106,7 +107,7 @@
             color: #ff6b6b;
             border: 1px solid rgba(255, 107, 107, 0.2);
         }
-        
+
         .type-other {
             background: rgba(100, 100, 100, 0.2);
             color: #ccc;
@@ -124,17 +125,51 @@
             text-align: right;
         }
 
-        .col-shares, .col-owned {
+        .col-shares,
+        .col-owned {
             font-family: 'JetBrains Mono', monospace;
             text-align: right;
             color: #bbb;
         }
+
+                .col-di {
+                     text-align: center;
+                }
         
-        .col-di {
-             text-align: center;
-        }
-    </style>
-</head>
+                .insider-legend {
+                    margin-top: 1.5rem;
+                    padding: 1rem;
+                    background: rgba(255, 255, 255, 0.03);
+                    border-radius: 8px;
+                    font-size: 0.8rem;
+                    color: #888;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 2rem;
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                }
+        
+                .legend-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+        
+                .legend-title {
+                    font-weight: 700;
+                    color: #aaa;
+                    margin-bottom: 4px;
+                    text-transform: uppercase;
+                    font-size: 0.7rem;
+                    letter-spacing: 0.05em;
+                }
+        
+                .legend-item span {
+                    color: #ccc;
+                    font-weight: 600;
+                    margin-right: 4px;
+                }
+            </style></head>
 
 <body>
 
@@ -152,7 +187,7 @@
         </div>
     </nav>
 
-    <main class="whales-page-container">
+    <main class="whales-page-container" style="max-width: 1300px;">
         <header class="whales-header">
             <h1 style="font-family: 'Inter', sans-serif;">Insider Trades</h1>
             <p style="font-family: 'Inter', sans-serif;">Real-time SEC Form 4 filings</p>
@@ -181,13 +216,33 @@
 
             <div class="filter-group search-group">
                 <label for="tickerSearch" class="filter-label">Search Ticker:</label>
-                <input type="text" id="tickerSearch" class="filter-input" placeholder="Search (e.g. AAPL)...">
+                <input type="text" id="tickerSearch" class="filter-input" placeholder="Search...">
             </div>
         </div>
 
         <div id="insiderFeed" class="insider-table-container">
             <div id="loadingState" style="text-align: center; color: #999; padding: 2rem;">
                 <p>Loading latest filings...</p>
+            </div>
+        </div>
+
+        <div class="insider-legend">
+            <div class="legend-group">
+                <div class="legend-title">Transaction Codes</div>
+                <div class="legend-item"><span>P</span> — Purchase</div>
+                <div class="legend-item"><span>S</span> — Sale</div>
+                <div class="legend-item"><span>A</span> — Award / Grant</div>
+                <div class="legend-item"><span>M</span> — Exercise of option</div>
+                <div class="legend-item"><span>F</span> — Payment of tax</div>
+            </div>
+            <div class="legend-group">
+                <div class="legend-title">Ownership (D/I)</div>
+                <div class="legend-item"><span>D</span> — Direct ownership</div>
+                <div class="legend-item"><span>I</span> — Indirect ownership</div>
+            </div>
+            <div class="legend-group">
+                <div class="legend-title">Note</div>
+                <div class="legend-item"><span>(Deriv)</span> — Derivative security (options, etc.)</div>
             </div>
         </div>
     </main>
@@ -217,9 +272,9 @@
         function formatCurrency(val) {
             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
         }
-        
+
         function formatNumber(val) {
-             return new Intl.NumberFormat('en-US').format(val);
+            return new Intl.NumberFormat('en-US').format(val);
         }
 
         function renderTable(data) {
@@ -250,10 +305,10 @@
             data.forEach(trade => {
                 const isPurchase = trade.code === 'P';
                 const isSale = trade.code === 'S';
-                
+
                 let typeClass = 'type-other';
                 let typeLabel = trade.code;
-                
+
                 if (isPurchase) {
                     typeClass = 'type-buy';
                     typeLabel = 'Buy';
@@ -261,7 +316,7 @@
                     typeClass = 'type-sell';
                     typeLabel = 'Sell';
                 }
-                
+
                 if (trade.derivative) {
                     typeLabel += ' (Deriv)';
                 }
@@ -270,7 +325,7 @@
                 const price = parseFloat(trade.price) || 0;
                 const shares = parseFloat(trade.shares) || 0;
                 const owned = parseFloat(trade.owned) || 0;
-                
+
                 // Truncate long company names
                 const companyName = trade.company.length > 25 ? trade.company.substring(0, 22) + '...' : trade.company;
                 const insiderName = trade.insider.length > 20 ? trade.insider.substring(0, 18) + '...' : trade.insider;
@@ -303,14 +358,14 @@
             const filtered = allData.filter(t => {
                 const val = parseFloat(t.value) || 0;
                 if (val < currentMinValue) return false;
-                
+
                 if (currentType !== 'all' && t.code !== currentType) return false;
-                
+
                 if (currentSearch) {
                     const search = currentSearch.toLowerCase();
                     if (!t.ticker.toLowerCase().includes(search) && !t.company.toLowerCase().includes(search)) return false;
                 }
-                
+
                 return true;
             });
 
@@ -321,13 +376,13 @@
             try {
                 // Initial loading state only if data is empty
                 if (allData.length === 0) {
-                     // feedContainer.innerHTML is initial state
+                    // feedContainer.innerHTML is initial state
                 }
-                
+
                 const response = await fetch('/api/insider');
                 if (!response.ok) throw new Error('Failed to load data');
                 const data = await response.json();
-                
+
                 allData = data;
                 renderFeed();
             } catch (err) {
@@ -356,10 +411,11 @@
 
         // Initialize
         loadInsiderData();
-        
+
         // Auto-refresh every hour (matches server cache)
         setInterval(loadInsiderData, 60 * 60 * 1000);
 
     </script>
 </body>
+
 </html>
