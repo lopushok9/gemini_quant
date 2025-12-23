@@ -30,8 +30,35 @@
         </div>
         <div class="nav-actions">
             <a href="https://github.com/lopushok9/gemini_quant" class="download-btn">Download</a>
+            <button class="mobile-menu-btn" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+            </button>
         </div>
     </nav>
+
+    <div id="mobileBackdrop" class="mobile-menu-backdrop" onclick="toggleMenu()"></div>
+    <div id="mobileMenu" class="mobile-menu-sidebar">
+        <div class="mobile-menu-header">
+            <button class="close-menu-btn" onclick="toggleMenu()">&times;</button>
+        </div>
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/whales">Poly Whales</a>
+        <a href="/insider">Insider Trades</a>
+        <a href="/how-to-use">How to Use</a>
+        <a href="/chat">Web agent</a>
+        <a href="/terms">Terms</a>
+        <a href="https://github.com/lopushok9/gemini_quant" style="color: #4A90E2; border-bottom: none; margin-top: auto; font-weight: 700;">Download App</a>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('mobileMenu').classList.toggle('active');
+            document.getElementById('mobileBackdrop').classList.toggle('active');
+            document.body.style.overflow = document.body.style.overflow === 'hidden' ? '' : 'hidden';
+        }
+    </script>
 
     <main class="text-page-container">
         <h1>About Quanty</h1>

@@ -329,8 +329,34 @@
                     <ion-icon name="power-outline"></ion-icon>
                 </button>
             </div>
+            <button class="mobile-menu-btn" onclick="toggleMenu()" style="margin-left: 10px;">
+                <span style="background-color: #04d674;"></span>
+                <span style="background-color: #04d674;"></span>
+            </button>
         </div>
     </nav>
+
+    <div id="mobileBackdrop" class="mobile-menu-backdrop" onclick="toggleMenu()"></div>
+    <div id="mobileMenu" class="mobile-menu-sidebar" style="background: rgba(12, 12, 12, 0.98); border-left: 1px solid #333;">
+        <div class="mobile-menu-header">
+            <button class="close-menu-btn" onclick="toggleMenu()" style="color: #04d674;">&times;</button>
+        </div>
+        <a href="/" style="color: #04d674; font-family: 'Fira Code'; border-bottom-color: #333;">Home</a>
+        <a href="/about" style="color: #04d674; font-family: 'Fira Code'; border-bottom-color: #333;">About</a>
+        <a href="/whales" style="color: #04d674; font-family: 'Fira Code'; border-bottom-color: #333;">Poly Whales</a>
+        <a href="/insider" style="color: #04d674; font-family: 'Fira Code'; border-bottom-color: #333;">Insider Trades</a>
+        <a href="/how-to-use" style="color: #04d674; font-family: 'Fira Code'; border-bottom-color: #333;">How to Use</a>
+        <a href="/chat" style="color: #04d674; font-family: 'Fira Code'; border-bottom-color: #333;">Terminal</a>
+        <a href="/terms" style="color: #04d674; font-family: 'Fira Code'; border-bottom-color: #333;">Terms</a>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('mobileMenu').classList.toggle('active');
+            document.getElementById('mobileBackdrop').classList.toggle('active');
+            document.body.style.overflow = document.body.style.overflow === 'hidden' ? '' : 'hidden';
+        }
+    </script>
 
     <main class="chat-main">
         <div class="chat-container">

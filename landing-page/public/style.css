@@ -196,6 +196,102 @@ a:hover {
     font-size: 16px;
 }
 
+/* Mobile Menu Button */
+.mobile-menu-btn {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    z-index: 1001;
+}
+
+.mobile-menu-btn span {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background-color: var(--color-text-main);
+    transition: all 0.3s ease;
+}
+
+/* Mobile Menu Sidebar */
+.mobile-menu-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 280px;
+    height: 100vh;
+    background: #FFFFFF;
+    z-index: 1002;
+    display: flex;
+    flex-direction: column;
+    padding: 2rem;
+    gap: 1.5rem;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+}
+
+.mobile-menu-sidebar.active {
+    transform: translateX(0);
+}
+
+/* Backdrop */
+.mobile-menu-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 1001;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Close Button in Sidebar */
+.mobile-menu-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.close-menu-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #333;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 5px;
+}
+
+.mobile-menu-sidebar a {
+    font-size: 1.1rem;
+    font-family: 'DM Sans', sans-serif; /* Modern font */
+    font-weight: 500;
+    color: #333;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 10px;
+}
+
+.mobile-menu-sidebar a:hover {
+    color: var(--color-accent);
+    padding-left: 5px;
+    transition: all 0.2s;
+}
+
+/* Responsiveness Updates */
 @media (max-width: 900px) {
     .cli-content {
         flex-direction: column;
@@ -205,19 +301,26 @@ a:hover {
     .cli-text-col {
         margin-bottom: 3rem;
         align-items: center;
-        /* If using flex col for badging centering */
         display: flex;
         flex-direction: column;
     }
 
     .cli-features-list li {
         justify-content: center;
-        /* Center list items on mobile if text centered */
     }
 
     .nav-links {
         display: none;
-        /* Hide links on mobile for now or burger menu (minimal scope: hide or stack) */
+    }
+
+    /* Hide Desktop Download Button */
+    .download-btn {
+        display: none;
+    }
+
+    /* Show Mobile Hamburger */
+    .mobile-menu-btn {
+        display: flex;
     }
 }
 
