@@ -1399,14 +1399,19 @@ a:hover {
 }
 
 .whales-header h1 {
+    font-family: 'DM Sans', sans-serif;
     font-size: 3.5rem;
+    font-weight: 700;
     margin-bottom: 1rem;
     color: #1a1a1a;
+    letter-spacing: -0.03em;
 }
 
 .whales-header p {
+    font-family: 'DM Sans', sans-serif;
     color: #666;
     font-size: 1.1rem;
+    font-weight: 400;
 }
 
 .whales-feed {
