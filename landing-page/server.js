@@ -9,6 +9,7 @@ const bs58 = require('bs58');
 const nacl = require('tweetnacl');
 const cors = require('cors'); // New dependency
 const { Connection, PublicKey } = require('@solana/web3.js');
+const { spawn } = require('child_process');
 
 const decode58 = (str) => {
     // Debug logging
@@ -41,6 +42,13 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+
+// Insider Data Cache
+let insiderCache = {
+    data: null,
+    lastFetch: 0
+};
+const INSIDER_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 // --- SECURITY CONFIG ---
 
@@ -281,6 +289,59 @@ app.get('/api/proxy/markets', async (req, res) => {
     }
 });
 
+// Insider Trading API
+app.get('/api/insider', async (req, res) => {
+    const now = Date.now();
+    if (insiderCache.data && (now - insiderCache.lastFetch < INSIDER_CACHE_DURATION)) {
+        return res.json(insiderCache.data);
+    }
+
+    // Path to the python script
+    // Assuming 'insider' directory is a sibling of 'landing-page' in parent dir 'gemini assistant'
+    // But here I'm running from landing-page root likely?
+    // The user path is /Users/yuriytsygankov/Documents/gemini assistant/landing-page/server.js
+    // The python script is /Users/yuriytsygankov/Documents/gemini assistant/insider/insider.py
+    const scriptPath = path.join(__dirname, '..', 'insider', 'insider.py');
+
+    const pythonProcess = spawn('python3', [scriptPath, '--json', '--limit', '100']);
+
+    let dataString = '';
+    let errorString = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+        dataString += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        errorString += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+            console.error(`Insider script process exited with code ${code}`);
+            console.error(errorString);
+            return res.status(500).json({ error: 'Failed to fetch insider data' });
+        }
+
+        try {
+            // The script might output other things if we are not careful, but --json should handle it.
+            // We need to find the JSON part if there is any noise, but my script mod only prints JSON on success.
+            // However, the script prints "Fetching RSS..." to stdout even with json? 
+            // Wait, I checked my code, I put `if not json_output` for all print statements except `print(json.dumps)`.
+            // So it should be clean JSON.
+            
+            const jsonData = JSON.parse(dataString);
+            insiderCache.data = jsonData;
+            insiderCache.lastFetch = Date.now();
+            res.json(jsonData);
+        } catch (e) {
+            console.error('Error parsing insider JSON:', e);
+            console.log('Raw output:', dataString);
+            res.status(500).json({ error: 'Invalid data format from insider script' });
+        }
+    });
+});
+
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -300,6 +361,10 @@ app.get('/how-to-use', (req, res) => {
 
 app.get('/whales', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'whales.html'));
+});
+
+app.get('/insider', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'insider.html'));
 });
 
 app.get('/chat', (req, res) => {

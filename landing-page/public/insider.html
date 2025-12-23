@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <title>Insider Trades - Quanty</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Ionicons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
+    <style>
+        /* Table Styles */
+        .insider-table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 1rem;
+            background: rgba(26, 26, 26, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1rem;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .insider-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+            white-space: nowrap;
+        }
+
+        .insider-table th {
+            text-align: left;
+            padding: 12px 16px;
+            color: #999;
+            font-weight: 500;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .insider-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .insider-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .insider-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Column specific styles */
+        .col-ticker {
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .col-company {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #bbb;
+        }
+
+        .col-insider {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .type-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .type-buy {
+            background: rgba(0, 129, 52, 0.2);
+            color: #27d468;
+            border: 1px solid rgba(39, 212, 104, 0.2);
+        }
+
+        .type-sell {
+            background: rgba(200, 50, 50, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.2);
+        }
+        
+        .type-other {
+            background: rgba(100, 100, 100, 0.2);
+            color: #ccc;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .col-value {
+            font-family: 'JetBrains Mono', monospace;
+            text-align: right;
+            color: #fff;
+        }
+
+        .col-price {
+            font-family: 'JetBrains Mono', monospace;
+            text-align: right;
+        }
+
+        .col-shares, .col-owned {
+            font-family: 'JetBrains Mono', monospace;
+            text-align: right;
+            color: #bbb;
+        }
+        
+        .col-di {
+             text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <div class="logo" style="color: #4a90e2;"><a href="/">Quanty</a></div>
+        <div class="nav-links">
+            <a href="/about">About</a>
+            <a href="/whales">Poly Whales</a>
+            <a href="/insider" class="active">Insider</a>
+            <a href="/how-to-use">How to Use</a>
+            <a href="/chat">Web agent</a>
+        </div>
+        <div class="nav-actions">
+            <a href="https://github.com/lopushok9/gemini_quant" class="download-btn">Download</a>
+        </div>
+    </nav>
+
+    <main class="whales-page-container">
+        <header class="whales-header">
+            <h1 style="font-family: 'Inter', sans-serif;">Insider Trades</h1>
+            <p style="font-family: 'Inter', sans-serif;">Real-time SEC Form 4 filings</p>
+        </header>
+
+        <div class="whales-filters">
+            <div class="filter-group">
+                <label for="minValueSelect" class="filter-label">Min. Value:</label>
+                <select id="minValueSelect" class="filter-select">
+                    <option value="10000">$10,000</option>
+                    <option value="50000">$50,000</option>
+                    <option value="100000">$100,000</option>
+                    <option value="500000">$500,000</option>
+                    <option value="1000000">$1,000,000</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="typeFilter" class="filter-label">Type:</label>
+                <select id="typeFilter" class="filter-select">
+                    <option value="all">All</option>
+                    <option value="P">Purchase</option>
+                    <option value="S">Sale</option>
+                </select>
+            </div>
+
+            <div class="filter-group search-group">
+                <label for="tickerSearch" class="filter-label">Search Ticker:</label>
+                <input type="text" id="tickerSearch" class="filter-input" placeholder="Search (e.g. AAPL)...">
+            </div>
+        </div>
+
+        <div id="insiderFeed" class="insider-table-container">
+            <div id="loadingState" style="text-align: center; color: #999; padding: 2rem;">
+                <p>Loading latest filings...</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/about">About</a>
+                <a href="/terms">Terms</a>
+                <a href="/how-to-use">How to Use</a>
+            </div>
+            <div class="copyright">
+                &copy; 2025 Quanty. DYOR.
+            </div>
+        </div>
+        <div class="footer-ca">CA: 5FYMEwjj1jHu4R2f9amsGhzGnyH2PghQ5dynW79tpump</div>
+    </footer>
+
+    <script>
+        let currentMinValue = 10000;
+        let currentType = 'all';
+        let currentSearch = '';
+        let allData = [];
+
+        const feedContainer = document.getElementById('insiderFeed');
+
+        function formatCurrency(val) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+        }
+        
+        function formatNumber(val) {
+             return new Intl.NumberFormat('en-US').format(val);
+        }
+
+        function renderTable(data) {
+            if (data.length === 0) {
+                feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
+                return;
+            }
+
+            let html = `
+                <table class="insider-table">
+                    <thead>
+                        <tr>
+                            <th>Trade</th>
+                            <th>Ticker</th>
+                            <th>Company</th>
+                            <th>Insider</th>
+                            <th>Type</th>
+                            <th style="text-align:right">Price</th>
+                            <th style="text-align:right">Shares</th>
+                            <th style="text-align:right">Owned</th>
+                            <th style="text-align:center">D/I</th>
+                            <th style="text-align:right">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach(trade => {
+                const isPurchase = trade.code === 'P';
+                const isSale = trade.code === 'S';
+                
+                let typeClass = 'type-other';
+                let typeLabel = trade.code;
+                
+                if (isPurchase) {
+                    typeClass = 'type-buy';
+                    typeLabel = 'Buy';
+                } else if (isSale) {
+                    typeClass = 'type-sell';
+                    typeLabel = 'Sell';
+                }
+                
+                if (trade.derivative) {
+                    typeLabel += ' (Deriv)';
+                }
+
+                const value = parseFloat(trade.value) || 0;
+                const price = parseFloat(trade.price) || 0;
+                const shares = parseFloat(trade.shares) || 0;
+                const owned = parseFloat(trade.owned) || 0;
+                
+                // Truncate long company names
+                const companyName = trade.company.length > 25 ? trade.company.substring(0, 22) + '...' : trade.company;
+                const insiderName = trade.insider.length > 20 ? trade.insider.substring(0, 18) + '...' : trade.insider;
+
+                html += `
+                    <tr>
+                        <td>${trade.trade_date}</td>
+                        <td class="col-ticker">${trade.ticker}</td>
+                        <td class="col-company" title="${trade.company}">${companyName}</td>
+                        <td class="col-insider" title="${trade.insider}">${insiderName}</td>
+                        <td><span class="type-badge ${typeClass}">${typeLabel}</span></td>
+                        <td class="col-price">$${price.toFixed(2)}</td>
+                        <td class="col-shares">${formatNumber(shares)}</td>
+                        <td class="col-owned">${formatNumber(owned)}</td>
+                        <td class="col-di">${trade.ownership}</td>
+                        <td class="col-value">${formatCurrency(value)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+            feedContainer.innerHTML = html;
+        }
+
+        function renderFeed() {
+            const filtered = allData.filter(t => {
+                const val = parseFloat(t.value) || 0;
+                if (val < currentMinValue) return false;
+                
+                if (currentType !== 'all' && t.code !== currentType) return false;
+                
+                if (currentSearch) {
+                    const search = currentSearch.toLowerCase();
+                    if (!t.ticker.toLowerCase().includes(search) && !t.company.toLowerCase().includes(search)) return false;
+                }
+                
+                return true;
+            });
+
+            renderTable(filtered);
+        }
+
+        async function loadInsiderData() {
+            try {
+                // Initial loading state only if data is empty
+                if (allData.length === 0) {
+                     // feedContainer.innerHTML is initial state
+                }
+                
+                const response = await fetch('/api/insider');
+                if (!response.ok) throw new Error('Failed to load data');
+                const data = await response.json();
+                
+                allData = data;
+                renderFeed();
+            } catch (err) {
+                console.error('Error:', err);
+                feedContainer.innerHTML = `<div style="text-align: center; color: #ff4d4d; padding: 2rem;"><p>Error loading data: ${err.message}</p></div>`;
+            }
+        }
+
+        // Filter Event Listeners
+        document.getElementById('minValueSelect').addEventListener('change', (e) => {
+            currentMinValue = parseInt(e.target.value);
+            renderFeed();
+        });
+
+        document.getElementById('typeFilter').addEventListener('change', (e) => {
+            currentType = e.target.value;
+            renderFeed();
+        });
+
+        let searchTimeout;
+        document.getElementById('tickerSearch').addEventListener('input', (e) => {
+            currentSearch = e.target.value.trim();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(renderFeed, 300);
+        });
+
+        // Initialize
+        loadInsiderData();
+        
+        // Auto-refresh every hour (matches server cache)
+        setInterval(loadInsiderData, 60 * 60 * 1000);
+
+    </script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import feedparser
 import argparse
 import time
 import re
+import json
 from urllib.parse import urljoin
 from lxml import etree, html
 from tabulate import tabulate
@@ -27,11 +28,12 @@ def normalize_sec_xml_url(url: str) -> str:
 
     return _XSL_DIR_RE.sub("/", url)
 
-def get_recent_form4_rss(count=100):
+def get_recent_form4_rss(count=100, quiet=False):
     """Fetch the latest Form 4 filings from the SEC RSS feed"""
     url = f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&owner=only&count={count}&output=atom"
     
-    print(f"Fetching RSS feed with the {count} latest Form 4 filings...")
+    if not quiet:
+        print(f"Fetching RSS feed with the {count} latest Form 4 filings...")
     time.sleep(0.11)  # SEC allows no more than 10 requests per second
     
     try:
@@ -47,11 +49,13 @@ def get_recent_form4_rss(count=100):
                 'updated': entry.updated if hasattr(entry, 'updated') else ''
             })
         
-        print(f"Found {len(entries)} filings")
+        if not quiet:
+            print(f"Found {len(entries)} filings")
         return entries
     
     except Exception as e:
-        print(f"Error fetching RSS: {e}")
+        if not quiet:
+            print(f"Error fetching RSS: {e}")
         return []
 
 
@@ -363,56 +367,63 @@ def format_transaction_code(code, is_derivative=False):
     return result
 
 
-def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_buysell=False):
+def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_buysell=False, json_output=False):
     """Main execution function"""
-    print("=" * 90)
-    print("SEC Form 4 Insider Trading Tracker")
-    print("=" * 90)
-    
-    if ticker_filter:
-        print(f"Ticker filter: {ticker_filter.upper()}")
-    if debug:
-        print("⚙ Debug mode enabled")
-    
-    print()
+    if not json_output:
+        print("=" * 90)
+        print("SEC Form 4 Insider Trading Tracker")
+        print("=" * 90)
+        
+        if ticker_filter:
+            print(f"Ticker filter: {ticker_filter.upper()}")
+        if debug:
+            print("⚙ Debug mode enabled")
+        
+        print()
     
     # Fetch RSS feed
-    entries = get_recent_form4_rss(count=limit)
+    entries = get_recent_form4_rss(count=limit, quiet=json_output)
     
     if not entries:
-        print("Failed to retrieve data from the RSS feed")
+        if not json_output:
+            print("Failed to retrieve data from the RSS feed")
         return
     
     all_transactions = []
+    seen_transactions = set() # For deduplication
     processed = 0
     errors = 0
     
-    print(f"\nProcessing {len(entries)} filings...")
-    print()
+    if not json_output:
+        print(f"\nProcessing {len(entries)} filings...")
+        print()
     
     for idx, entry in enumerate(entries, 1):
-        title = entry['title'][:70]
-        print(f"[{idx}/{len(entries)}] {title}...", end=' ')
-        
-        if debug:
-            print(f"\n  Filing URL: {entry['link']}")
+        if not json_output:
+            title = entry['title'][:70]
+            print(f"[{idx}/{len(entries)}] {title}...", end=' ')
+            
+            if debug:
+                print(f"\n  Filing URL: {entry['link']}")
         
         # Get XML URL
         xml_url = get_xml_url_from_filing(entry['link'], debug=debug)
         
         if not xml_url:
-            print("❌ XML not found")
+            if not json_output:
+                print("❌ XML not found")
             errors += 1
             continue
         
-        if debug:
+        if debug and not json_output:
             print(f"  XML URL: {xml_url}")
         
         # Download XML
         xml_data = fetch_and_parse_xml(xml_url, debug=debug)
         
         if not xml_data:
-            print("⚠ Invalid format")
+            if not json_output:
+                print("⚠ Invalid format")
             errors += 1
             continue
         
@@ -420,25 +431,55 @@ def main(ticker_filter=None, limit=40, show_derivatives=True, debug=False, only_
         transactions = parse_form4_xml(xml_data)
         
         if transactions:
-            # Filtering
-            if ticker_filter:
-                transactions = [t for t in transactions if t['ticker'].upper() == ticker_filter.upper()]
-            
-            if not show_derivatives:
-                transactions = [t for t in transactions if not t['derivative']]
-            
-            if only_buysell:
-                transactions = [t for t in transactions if t['code'] in ('P', 'S')]
-            
-            if transactions:
-                print(f"✓ {len(transactions)} trades")
-                all_transactions.extend(transactions)
+            # Filtering and Deduplication
+            unique_batch = []
+            for t in transactions:
+                # Create a unique signature for the trade
+                # We use str() for float values to avoid minor precision issues, 
+                # though exact string match from XML is safer if available. 
+                # Here we trust the parsed values are consistent.
+                trade_sig = (
+                    t['filing_date'],
+                    t['trade_date'],
+                    t['ticker'],
+                    t['insider'],
+                    t['code'],
+                    str(t['price']),
+                    str(t['shares']),
+                    t['ownership'],
+                    str(t['value']),
+                    t['derivative']
+                )
+                
+                if trade_sig not in seen_transactions:
+                    seen_transactions.add(trade_sig)
+                    
+                    # Apply other filters here to save processing
+                    if ticker_filter and t['ticker'].upper() != ticker_filter.upper():
+                        continue
+                    if not show_derivatives and t['derivative']:
+                        continue
+                    if only_buysell and t['code'] not in ('P', 'S'):
+                        continue
+                        
+                    unique_batch.append(t)
+
+            if unique_batch:
+                if not json_output:
+                    print(f"✓ {len(unique_batch)} new trades")
+                all_transactions.extend(unique_batch)
                 processed += 1
             else:
-                print("⊘ Filtered out")
+                if not json_output:
+                    print("⊘ Filtered or Duplicate")
         else:
-            print("⚠ No data")
+            if not json_output:
+                print("⚠ No data")
     
+    if json_output:
+        print(json.dumps(all_transactions))
+        return
+
     print()
     print("=" * 90)
     print(f"Processed: {processed} filings | Errors: {errors} | Trades found: {len(all_transactions)}")
@@ -525,6 +566,7 @@ Examples:
   python insider.py --ticker NVDA --limit 200
   python insider.py --no-derivatives         # Hide derivatives
   python insider.py --only-buysell           # Only Purchases and Sales (P/S)
+  python insider.py --json                   # Output as JSON
         '''
     )
     
@@ -558,6 +600,12 @@ Examples:
         help='Display only Purchases (P) and Sales (S)',
         action='store_true'
     )
+
+    parser.add_argument(
+        '--json',
+        help='Output results as JSON',
+        action='store_true'
+    )
     
     args = parser.parse_args()
     
@@ -567,7 +615,8 @@ Examples:
             limit=args.limit,
             show_derivatives=not args.no_derivatives,
             debug=args.debug,
-            only_buysell=args.only_buysell
+            only_buysell=args.only_buysell,
+            json_output=args.json
         )
     except KeyboardInterrupt:
         print("\n\n⚠ Interrupted by user")
