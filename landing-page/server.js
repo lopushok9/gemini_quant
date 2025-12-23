@@ -43,267 +43,22 @@ const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.s
 
 const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
 
-// Insider Data Cache
+// Insider Data Cache and Background Worker
 let insiderCache = {
-    data: null,
-    lastFetch: 0
+    data: [],
+    lastFetch: 0,
+    isUpdating: false
 };
-const INSIDER_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+const INSIDER_UPDATE_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
-// --- SECURITY CONFIG ---
+const scriptPath = path.join(__dirname, '..', 'insider', 'insider.py');
 
-// 1. CORS Configuration
-const allowedOrigins = [
-    'http://localhost:3000',
-    'https://www.quantycli.tech',
-    'https://quantycli.tech' // Optional: handle non-www too
-];
+function updateInsiderData() {
+    if (insiderCache.isUpdating) return;
+    insiderCache.isUpdating = true;
+    console.log(`[Insider] Starting background update at ${new Date().toISOString()}...`);
 
-app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            return callback(new Error(msg), false);
-        }
-        return callback(null, true);
-    },
-    credentials: true
-}));
-
-// 2. Rate Limiter (In-Memory)
-// Map: WalletAddress -> { count: number, resetTime: number }
-const USAGE_LIMIT = 3; // Max requests
-const LIMIT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
-const requestCounts = new Map();
-
-const rateLimitMiddleware = (req, res, next) => {
-    // Requires req.user to be populated by authMiddleware
-    if (!req.user || !req.user.publicKey) {
-        // If not auth, skip or block? Auth middleware runs first, so this is safe.
-        return next();
-    }
-
-    const wallet = req.user.publicKey;
-    const now = Date.now();
-
-    let userStats = requestCounts.get(wallet);
-
-    // Init or Reset if window expired
-    if (!userStats || now > userStats.resetTime) {
-        userStats = {
-            count: 0,
-            resetTime: now + LIMIT_WINDOW
-        };
-    }
-
-    if (userStats.count >= USAGE_LIMIT) {
-        const resetHours = ((userStats.resetTime - now) / 1000 / 60 / 60).toFixed(1);
-        return res.status(429).json({
-            error: `Daily limit reached (${USAGE_LIMIT}/${USAGE_LIMIT}). Resets in ${resetHours} hrs.`
-        });
-    }
-
-    // Increment
-    userStats.count++;
-    requestCounts.set(wallet, userStats);
-
-    console.log(`[Usage] Wallet: ${wallet} | Count: ${userStats.count}/${USAGE_LIMIT}`);
-    next();
-};
-
-// Middleware
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-
-// Helper: Check Token Balance
-async function checkTokenBalance(walletAddress) {
-    try {
-        const pubkey = new PublicKey(walletAddress);
-        const mint = new PublicKey(TOKEN_MINT_ADDRESS);
-
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, { mint });
-
-        if (tokenAccounts.value.length === 0) return 0;
-
-        // Sum up balance from all accounts
-        return tokenAccounts.value.reduce((acc, account) => {
-            return acc + (account.account.data.parsed.info.tokenAmount.uiAmount || 0);
-        }, 0);
-    } catch (error) {
-        console.error('Balance check error:', error);
-        return 0;
-    }
-}
-
-// Middleware: Verify JWT
-const authMiddleware = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
-
-    const token = authHeader.split(' ')[1];
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (err) {
-        return res.status(401).json({ error: 'Invalid token' });
-    }
-};
-
-// API: Login with Wallet
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { publicKey, signature, timestamp } = req.body;
-
-        if (!publicKey || !signature || !timestamp) {
-            return res.status(400).json({ error: 'Missing credentials' });
-        }
-
-        const now = Date.now();
-        // Allow 5 min tolerance
-        if (Math.abs(now - timestamp) > 5 * 60 * 1000) {
-            return res.status(400).json({ error: 'Expired request' });
-        }
-
-        // Verify Signature
-        const message = new TextEncoder().encode(`Access Quanty AI - Date: ${timestamp}`);
-        const signatureBytes = decode58(signature);
-        const publicKeyBytes = new PublicKey(publicKey).toBytes();
-
-        const verified = nacl.sign.detached.verify(message, signatureBytes, publicKeyBytes);
-
-        if (!verified) {
-            return res.status(401).json({ error: 'Invalid signature' });
-        }
-
-        // Check Token Balance
-        if (!TOKEN_MINT_ADDRESS) {
-            console.error('SECURITY ERROR: TOKEN_MINT_ADDRESS not set. Denying access.');
-            return res.status(500).json({ error: 'Server configuration error: Token Gate missing' });
-        } else {
-            const balance = await checkTokenBalance(publicKey);
-            if (balance < MIN_TOKEN_AMOUNT) {
-                return res.status(403).json({
-                    error: 'Insufficient token balance',
-                    balance,
-                    required: MIN_TOKEN_AMOUNT
-                });
-            }
-        }
-
-        // Generate Token
-        const token = jwt.sign({ publicKey }, JWT_SECRET, { expiresIn: '24h' });
-
-        res.json({ token, success: true });
-
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// System Prompts
-const PROMPTS = {
-    'default': `You are a professional equity research analyst providing institutional-grade trading analysis. When given a stock ticker, conduct comprehensive research and analysis using this exact framework:
-
-RESEARCH METHODOLOGY:
-- Financial Performance: earnings, revenue growth, margins, key business metrics
-- Market Positioning: peer comparisons, sector performance, competitive analysis
-- Advanced Intelligence: technical analysis, options flow, insider activity
-
-OUTPUT FORMAT - Generate analysis using this EXACT structure:
-
-# [TICKER] - ENHANCED EQUITY RESEARCH
-
-## EXECUTIVE SUMMARY
-[BUY/SELL/HOLD] with $[X] price target ([X]% upside/downside) over [timeframe]. [Key catalyst and investment thesis].
-
-## FUNDAMENTAL ANALYSIS
-- **Recent Financial Metrics**: Revenue growth %, margins, key business KPIs
-- **Peer Comparison**: Valuation multiples vs competitors (P/E, P/S ratios)
-- **Forward Outlook**: Management guidance, analyst consensus, growth projections
-
-## CATALYST ANALYSIS
-- **Near-term (0-6 months)**: Specific upcoming events with dates
-- **Medium-term (6-24 months)**: Strategic initiatives, market expansion
-
-## RISK ASSESSMENT
-- **Company risks**: Competitive threats, regulatory issues, operational challenges
-- **Macro risks**: Interest rate sensitivity, economic cycle impact
-- **Position sizing**: Recommended allocation based on risk factors
-
-## TECHNICAL CONTEXT
-- Current price vs 52-week range
-- Key support/resistance levels
-- Recent volume patterns and momentum indicators
-
-## RECOMMENDATION SUMMARY
-
-| Metric | Value |
-|--------|-------|
-| Rating | [BUY/SELL/HOLD] |
-| Conviction | [High/Medium/Low] |
-| Price Target | $[X] |
-| Timeframe | [X] months |
-| Upside/Downside | [X]% |
-
-## INVESTMENT THESIS
-
-**Bull Case**: [2-3 sentences explaining optimistic scenario]
-
-**Bear Case**: [2-3 sentences explaining pessimistic scenario]
-
-**Conclusion**: [Summary recommendation with key drivers]
-
----
-*DISCLAIMER: This analysis is for educational purposes only. Not financial advice. DYOR.*`
-};
-
-// Proxy for Polymarket API (to avoid CORS)
-app.get('/api/proxy/whales', async (req, res) => {
-    try {
-        const response = await fetch('https://data-api.polymarket.com/trades?limit=1500');
-        if (!response.ok) throw new Error(`Polymarket API error: ${response.status}`);
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error('Proxy error:', error);
-        res.status(500).json({ error: 'Failed to fetch trades from Polymarket' });
-    }
-});
-
-app.get('/api/proxy/markets', async (req, res) => {
-    try {
-        const conditionId = req.query.condition_id;
-        if (!conditionId) return res.status(400).json({ error: 'condition_id is required' });
-
-        const response = await fetch(`https://gamma-api.polymarket.com/markets?conditionId=${conditionId}`);
-        if (!response.ok) throw new Error(`Polymarket API error: ${response.status}`);
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error('Proxy error (markets):', error);
-        res.status(500).json({ error: 'Failed to fetch market from Polymarket' });
-    }
-});
-
-// Insider Trading API
-app.get('/api/insider', async (req, res) => {
-    const now = Date.now();
-    if (insiderCache.data && (now - insiderCache.lastFetch < INSIDER_CACHE_DURATION)) {
-        return res.json(insiderCache.data);
-    }
-
-    // Path to the python script
-    // Assuming 'insider' directory is a sibling of 'landing-page' in parent dir 'gemini assistant'
-    // But here I'm running from landing-page root likely?
-    // The user path is /Users/yuriytsygankov/Documents/gemini assistant/landing-page/server.js
-    // The python script is /Users/yuriytsygankov/Documents/gemini assistant/insider/insider.py
-    const scriptPath = path.join(__dirname, '..', 'insider', 'insider.py');
-
-    const pythonProcess = spawn('python3', [scriptPath, '--json', '--limit', '100']);
+    const pythonProcess = spawn('python3', [scriptPath, '--json', '--limit', '60']);
 
     let dataString = '';
     let errorString = '';
@@ -317,29 +72,43 @@ app.get('/api/insider', async (req, res) => {
     });
 
     pythonProcess.on('close', (code) => {
+        insiderCache.isUpdating = false;
+        
         if (code !== 0) {
-            console.error(`Insider script process exited with code ${code}`);
+            console.error(`[Insider] Script exited with code ${code}`);
             console.error(errorString);
-            return res.status(500).json({ error: 'Failed to fetch insider data' });
+            return;
         }
 
         try {
-            // The script might output other things if we are not careful, but --json should handle it.
-            // We need to find the JSON part if there is any noise, but my script mod only prints JSON on success.
-            // However, the script prints "Fetching RSS..." to stdout even with json? 
-            // Wait, I checked my code, I put `if not json_output` for all print statements except `print(json.dumps)`.
-            // So it should be clean JSON.
-            
             const jsonData = JSON.parse(dataString);
-            insiderCache.data = jsonData;
-            insiderCache.lastFetch = Date.now();
-            res.json(jsonData);
+            if (Array.isArray(jsonData) && jsonData.length > 0) {
+                insiderCache.data = jsonData;
+                insiderCache.lastFetch = Date.now();
+                console.log(`[Insider] Cache updated with ${jsonData.length} records.`);
+            } else {
+                 console.warn('[Insider] Script returned empty data or invalid format.');
+            }
         } catch (e) {
-            console.error('Error parsing insider JSON:', e);
-            console.log('Raw output:', dataString);
-            res.status(500).json({ error: 'Invalid data format from insider script' });
+            console.error('[Insider] JSON Parse Error:', e);
         }
     });
+}
+
+// Initial fetch on server start
+updateInsiderData();
+// Schedule background updates
+setInterval(updateInsiderData, INSIDER_UPDATE_INTERVAL);
+
+// Insider Trading API - Returns Cached Data Instantly
+app.get('/api/insider', (req, res) => {
+    // If cache is empty and not updating, trigger an update (fallback)
+    if (insiderCache.data.length === 0 && !insiderCache.isUpdating) {
+        updateInsiderData();
+    }
+    
+    // Return what we have (empty array initially, then populated data)
+    res.json(insiderCache.data);
 });
 
 // Routes
