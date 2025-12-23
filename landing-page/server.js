@@ -16,7 +16,7 @@ const decode58 = (str) => {
 };
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Token Gating Configuration
 const TOKEN_MINT_ADDRESS = process.env.TOKEN_MINT_ADDRESS;
@@ -26,7 +26,6 @@ const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.s
 
 if (!JWT_SECRET) {
     console.error('FATAL ERROR: JWT_SECRET is not defined.');
-    process.exit(1);
 }
 
 const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
@@ -49,7 +48,7 @@ app.use(cors({
     credentials: true
 }));
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 app.use(express.json());
 
 // --- RATE LIMITER ---
@@ -106,14 +105,13 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
-// --- INSIDER DATA CACHE ---
+// --- INSIDER DATA CACHE (Local Only) ---
 let insiderCache = { data: [], lastFetch: 0, isUpdating: false };
 const INSIDER_UPDATE_INTERVAL = 30 * 60 * 1000;
-const scriptPath = path.join(__dirname, '..', 'insider', 'insider.py');
+const scriptPath = path.join(process.cwd(), '..', 'insider', 'insider.py');
 
 function updateInsiderData() {
-    // Не запускаем spawn на Vercel, там работает отдельная serverless функция в /api/insider_feed.py
-    if (process.env.VERCEL) return;
+    if (process.env.VERCEL) return; // Не запускаем на Vercel
     
     if (insiderCache.isUpdating) return;
     insiderCache.isUpdating = true;
@@ -137,7 +135,6 @@ function updateInsiderData() {
     });
 }
 
-// Запускаем локально или если не на Vercel
 if (!process.env.VERCEL) {
     updateInsiderData();
     setInterval(updateInsiderData, INSIDER_UPDATE_INTERVAL);
@@ -145,14 +142,7 @@ if (!process.env.VERCEL) {
 
 // --- API ENDPOINTS ---
 
-app.get('/api/insider', (req, res) => {
-    // На Vercel этот роут должен перехватываться vercel.json -> /api/insider_feed.py
-    // Но на всякий случай или для локала возвращаем кэш
-    if (!process.env.VERCEL && insiderCache.data.length === 0 && !insiderCache.isUpdating) {
-        updateInsiderData();
-    }
-    res.json(insiderCache.data);
-});
+app.post('/api/auth/login', async (req, res) => {
     try {
         const { publicKey, signature, timestamp } = req.body;
         if (!publicKey || !signature || !timestamp) return res.status(400).json({ error: 'Missing credentials' });
@@ -169,11 +159,14 @@ app.get('/api/insider', (req, res) => {
 
         const token = jwt.sign({ publicKey }, JWT_SECRET, { expiresIn: '24h' });
         res.json({ token, success: true, balance });
-    } catch (error) { res.status(500).json({ error: 'Internal error' }); }
+    } catch (error) { 
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'Internal error' }); 
+    } 
 });
 
 app.get('/api/insider', (req, res) => {
-    if (insiderCache.data.length === 0 && !insiderCache.isUpdating) updateInsiderData();
+    // На Vercel этот запрос будет перехвачен vercel.json и направлен в api/insider_feed.py
     res.json(insiderCache.data);
 });
 
@@ -185,14 +178,14 @@ app.get('/api/proxy/whales', async (req, res) => {
     } catch (e) { res.status(500).json({ error: 'Proxy error' }); }
 });
 
-// Routes
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')))
-app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'public', 'about.html')))
-app.get('/terms', (req, res) => res.sendFile(path.join(__dirname, 'public', 'terms.html')))
-app.get('/how-to-use', (req, res) => res.sendFile(path.join(__dirname, 'public', 'how-to-use.html')))
-app.get('/whales', (req, res) => res.sendFile(path.join(__dirname, 'public', 'whales.html')))
-app.get('/insider', (req, res) => res.sendFile(path.join(__dirname, 'public', 'insider.html')))
-app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')))
+// Routes - Using absolute paths for Vercel compatibility
+app.get('/', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'index.html')))
+app.get('/about', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'about.html')))
+app.get('/terms', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'terms.html')))
+app.get('/how-to-use', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'how-to-use.html')))
+app.get('/whales', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'whales.html')))
+app.get('/insider', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'insider.html')))
+app.get('/chat', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'chat.html')))
 
 const PROMPTS = { default: `You are a professional equity research analyst...` };
 
@@ -236,7 +229,11 @@ app.post('/api/chat', authMiddleware, rateLimitMiddleware, async (req, res) => {
             }
         }
         res.end();
-    } catch (e) { res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`); res.end(); }
+    } catch (e) { 
+        console.error('Chat error:', e);
+        res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`); 
+        res.end(); 
+    }
 });
 
-app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
+app.listen(port, () => console.log(`Server running on port ${port}`));
