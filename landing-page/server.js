@@ -112,9 +112,12 @@ const INSIDER_UPDATE_INTERVAL = 30 * 60 * 1000;
 const scriptPath = path.join(__dirname, '..', 'insider', 'insider.py');
 
 function updateInsiderData() {
+    // Не запускаем spawn на Vercel, там работает отдельная serverless функция в /api/insider_feed.py
+    if (process.env.VERCEL) return;
+    
     if (insiderCache.isUpdating) return;
     insiderCache.isUpdating = true;
-    console.log(`[Insider] Updating data...`);
+    console.log(`[Insider] Updating data (local)...`);
 
     const pythonProcess = spawn('python3', [scriptPath, '--json', '--limit', '60']);
     let dataString = '';
@@ -134,12 +137,22 @@ function updateInsiderData() {
     });
 }
 
-updateInsiderData();
-setInterval(updateInsiderData, INSIDER_UPDATE_INTERVAL);
+// Запускаем локально или если не на Vercel
+if (!process.env.VERCEL) {
+    updateInsiderData();
+    setInterval(updateInsiderData, INSIDER_UPDATE_INTERVAL);
+}
 
 // --- API ENDPOINTS ---
 
-app.post('/api/auth/login', async (req, res) => {
+app.get('/api/insider', (req, res) => {
+    // На Vercel этот роут должен перехватываться vercel.json -> /api/insider_feed.py
+    // Но на всякий случай или для локала возвращаем кэш
+    if (!process.env.VERCEL && insiderCache.data.length === 0 && !insiderCache.isUpdating) {
+        updateInsiderData();
+    }
+    res.json(insiderCache.data);
+});
     try {
         const { publicKey, signature, timestamp } = req.body;
         if (!publicKey || !signature || !timestamp) return res.status(400).json({ error: 'Missing credentials' });
