@@ -1,0 +1,5 @@
+requests
+feedparser
+lxml
+tabulate
+flask

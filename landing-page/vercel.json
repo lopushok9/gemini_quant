@@ -1,17 +1,9 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "server.js",
-            "use": "@vercel/node",
-            "config": {
-                "includeFiles": [
-                    "public/**"
-                ]
-            }
-        }
-    ],
     "rewrites": [
+        {
+            "source": "/api/insider",
+            "destination": "/api/insider_feed.py"
+        },
         {
             "source": "/(.*)",
             "destination": "/server.js"

@@ -397,6 +397,13 @@
                 return true;
             });
 
+            // Sort by trade_date descending (newest first)
+            filtered.sort((a, b) => {
+                const dateA = new Date(a.trade_date);
+                const dateB = new Date(b.trade_date);
+                return dateB - dateA;
+            });
+
             renderTable(filtered);
         }
 
