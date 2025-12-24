@@ -165,7 +165,7 @@ def parse_form4_xml(xml_data):
 
 @app.route('/api/insider', methods=['GET'])
 @app.route('/', methods=['GET'])
-def handler():
+def get_insider_data():
     try:
         # Process only a small batch to avoid timeout, 
         # Vercel functions have 10s default limit (can be 60s on Pro)
