@@ -1,12 +1,23 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, make_response
 import requests
 import feedparser
 import time
 import re
 from urllib.parse import urljoin
 from lxml import etree, html
+import concurrent.futures
 
 app = Flask(__name__)
+
+# --- Caching Configuration ---
+# Global in-memory cache (persists as long as the Vercel container is warm)
+CACHE = {
+    "data": [],
+    "timestamp": 0
+}
+# Cache duration in seconds (10 minutes)
+# We use a longer duration to be safe from SEC rate limits
+CACHE_DURATION = 600 
 
 # --- Copied and Adapted Logic from insider.py ---
 
@@ -163,10 +174,6 @@ def parse_form4_xml(xml_data):
 
 # --- Vercel Handler ---
 
-import concurrent.futures
-
-# ... existing imports ...
-
 # Helper to process a single RSS entry
 def process_entry(entry):
     try:
@@ -183,11 +190,27 @@ def process_entry(entry):
 @app.route('/api/insider', methods=['GET'])
 @app.route('/', methods=['GET'])
 def get_insider_data():
+    global CACHE
+    current_time = time.time()
+    
+    # 1. Check Memory Cache
+    # If we have data and it's fresh (less than CACHE_DURATION seconds old)
+    if CACHE["data"] and (current_time - CACHE["timestamp"] < CACHE_DURATION):
+        print(f"Serving {len(CACHE['data'])} records from internal cache. Age: {int(current_time - CACHE['timestamp'])}s")
+        response = make_response(jsonify(CACHE["data"]))
+        
+        # Add headers so Vercel CDN and Browser cache this too
+        # s-maxage=600: Cloud/Vercel CDN will cache for 10 min
+        # max-age=300: Browser will cache for 5 min
+        response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=600, stale-while-revalidate=30'
+        return response
+
     try:
+        print("Cache expired or empty. Fetching fresh data from SEC...")
         start_time = time.time()
-        # Increase limit since we are now parallel
-        # Note: 40 entries is ambitious but parallel processing handles it better
-        entries = get_recent_form4_rss(count=40) 
+        
+        # Increase count slightly since we are caching
+        entries = get_recent_form4_rss(count=50) 
         
         all_transactions = []
         seen = set()
@@ -201,6 +224,7 @@ def get_insider_data():
                 # Safety timeout: Vercel free tier times out at 10s. 
                 # We stop gathering results at 8.5s to ensure we have time to return JSON.
                 if time.time() - start_time > 8.5:
+                    print("Time limit reached, stopping fetch.")
                     executor.shutdown(wait=False, cancel_futures=True)
                     break
                 
@@ -215,8 +239,23 @@ def get_insider_data():
                 except Exception:
                     continue
         
-        return jsonify(all_transactions)
+        # Update Cache if we got data
+        if all_transactions:
+            CACHE["data"] = all_transactions
+            CACHE["timestamp"] = current_time
+            print(f"Cache updated with {len(all_transactions)} records.")
+        
+        response = make_response(jsonify(CACHE["data"]))
+        response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=600, stale-while-revalidate=30'
+        return response
+        
     except Exception as e:
+        print(f"Error: {e}")
+        # Fallback: serve stale cache if available, even if expired
+        if CACHE["data"]:
+             print("Serving stale cache due to error.")
+             return jsonify(CACHE["data"])
+             
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 @app.route('/api/debug', methods=['GET'])
