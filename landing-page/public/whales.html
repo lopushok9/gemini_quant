@@ -297,74 +297,11 @@
         // Initial load of recent trades
         let lastLoadId = 0;
         async function loadInitialTrades() {
-            const loadId = ++lastLoadId;
-            try {
-                console.log(`[Whales] Loading history (Min: $${currentMinSize}, Prob: ${currentProbMode})`);
-                const response = await fetch('/api/proxy/whales');
-                if (!response.ok) {
-                    throw new Error(`Proxy error: ${response.status}`);
-                }
-                const trades = await response.json();
-
-                if (loadId !== lastLoadId) return;
-
-                removeLoadingState();
-                const feedContainer = document.getElementById('whalesFeed');
-                feedContainer.innerHTML = '';
-
-                let count = 0;
-                const tradesToProcess = Array.isArray(trades) ? trades : [];
-
-                // Process newest first (API returns newest first)
-                for (const t of tradesToProcess) {
-                    if (count >= 3) break;
-                    if (loadId !== lastLoadId) return;
-
-                    const price = parseFloat(t.price);
-                    const size = parseFloat(t.size);
-                    const notional = price * size;
-                    const conditionId = t.conditionId || t.condition_id;
-                    const outcomeStr = (t.outcome || '').toString().toLowerCase();
-                    const side = (t.side || '').toUpperCase();
-
-                    const matchesSize = notional >= currentMinSize;
-                    const matchesOutcome = currentOutcome === 'all' || outcomeStr === currentOutcome;
-                    const matchesProb = currentProbMode === 'all' || (price >= 0.10 && price <= 0.90);
-
-                    if (side === 'BUY' && matchesSize && matchesOutcome && matchesProb && conditionId) {
-                        const market = await fetchMarketDetails(conditionId);
-
-                        if (loadId !== lastLoadId) return;
-
-                        const question = market?.question || '';
-                        const matchesSearch = !currentSearch || question.toLowerCase().includes(currentSearch);
-
-                        if (market && !market.closed && matchesSearch) {
-                            const formattedTrade = {
-                                size: size,
-                                price: price,
-                                outcome: t.outcome,
-                                proxyWallet: t.proxyWallet || t.proxy_wallet || 'Unknown',
-                                conditionId: conditionId,
-                                timestamp: t.timestamp || t.time || t.created_at
-                            };
-                            const card = createWhaleCard(formattedTrade, market);
-                            feedContainer.appendChild(card);
-                            count++;
-                        }
-                    }
-                }
-
-                if (count === 0 && loadId === lastLoadId) {
-                    feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters in recent history. Waiting for live updates...</p></div>';
-                }
-                console.log(`[Whales] History load complete. Shown: ${count}`);
-            } catch (err) {
-                if (loadId !== lastLoadId) return;
-                console.error('Error loading initial trades:', err);
-                const feedContainer = document.getElementById('whalesFeed');
-                removeLoadingState();
-                feedContainer.innerHTML = `<div style="text-align: center; color: #000000; padding: 2rem;"><p>Please wait  ${err.message}</p></div>`;
+            console.log('[Whales] History loading disabled. Waiting for live trades...');
+            const feedContainer = document.getElementById('whalesFeed');
+            // If empty, show waiting message
+            if (!feedContainer.querySelector('#loadingState') && feedContainer.children.length === 0) {
+                 feedContainer.innerHTML = '<div id="loadingState" style="text-align: center; color: #999; padding: 2rem;"><p>Waiting for large trades...</p></div>';
             }
         }
 
@@ -401,7 +338,7 @@
             const div = document.createElement('div');
             div.id = 'loadingState';
             div.style = 'text-align: center; color: #999; padding: 2rem;';
-            div.innerHTML = '<p>Loading history...</p>';
+            div.innerHTML = '<p>Waiting for large trades...</p>';
             return div;
         }
 
