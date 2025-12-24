@@ -210,7 +210,7 @@ def get_insider_data():
         start_time = time.time()
         
         # Increase count slightly since we are caching
-        entries = get_recent_form4_rss(count=50) 
+        entries = get_recent_form4_rss(count=100) 
         
         all_transactions = []
         seen = set()
