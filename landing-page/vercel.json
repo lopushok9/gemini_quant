@@ -1,10 +1,11 @@
 {
     "cleanUrls": true,
+    "functions": {
+        "api/insider.py": {
+            "runtime": "python3.9"
+        }
+    },
     "rewrites": [
-        {
-            "source": "/api/insider",
-            "destination": "/api/insider_feed.py"
-        },
         {
             "source": "/(.*)",
             "destination": "/server.js"

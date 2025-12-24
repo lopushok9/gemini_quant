@@ -164,6 +164,7 @@ def parse_form4_xml(xml_data):
 # --- Vercel Handler ---
 
 @app.route('/api/insider', methods=['GET'])
+@app.route('/', methods=['GET'])
 def handler():
     try:
         # Process only a small batch to avoid timeout, 
