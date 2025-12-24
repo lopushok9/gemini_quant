@@ -54,7 +54,8 @@
         <a href="/how-to-use">How to Use</a>
         <a href="/chat">Web agent</a>
         <a href="/terms">Terms</a>
-        <a href="https://github.com/lopushok9/gemini_quant" style="color: #4A90E2; border-bottom: none; margin-top: auto; font-weight: 700;">Download App</a>
+        <a href="https://github.com/lopushok9/gemini_quant"
+            style="color: #4A90E2; border-bottom: none; margin-top: auto; font-weight: 700;">Download App</a>
     </div>
 
     <script>
@@ -363,7 +364,7 @@
                 console.error('Error loading initial trades:', err);
                 const feedContainer = document.getElementById('whalesFeed');
                 removeLoadingState();
-                feedContainer.innerHTML = `<div style="text-align: center; color: #ff4d4d; padding: 2rem;"><p>Failed to load history: ${err.message}</p></div>`;
+                feedContainer.innerHTML = `<div style="text-align: center; color: #000000; padding: 2rem;"><p>Please wait  ${err.message}</p></div>`;
             }
         }
 
