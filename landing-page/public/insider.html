@@ -305,26 +305,72 @@
             return new Intl.NumberFormat('en-US').format(val);
         }
 
-        function renderTable(data) {
-            if (data.length === 0) {
-                feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
-                return;
-            }
+        function aggregateTransactions(data) {
+            const groups = {};
+
+            data.forEach(t => {
+                // Create a unique key for grouping: Ticker + Insider Name + Transaction Code
+                // We use the filing date to ensure we don't merge trades from different reporting periods if they happen to appear together
+                const key = `${t.ticker}|${t.insider}|${t.code}|${t.filing_date}`;
+
+                if (!groups[key]) {
+                    groups[key] = {
+                        ...t,
+                        totalShares: parseFloat(t.shares) || 0,
+                        totalValue: parseFloat(t.value) || 0,
+                        count: 1,
+                        // We track the latest 'owned' value in the group
+                        maxOwned: parseFloat(t.owned) || 0
+                    };
+                } else {
+                    const shares = parseFloat(t.shares) || 0;
+                    const value = parseFloat(t.value) || 0;
+                    const owned = parseFloat(t.owned) || 0;
+
+                    groups[key].totalShares += shares;
+                    groups[key].totalValue += value;
+                    groups[key].count += 1;
+                    // Update owned to be the latest (heuristic: usually the entry with the latest outcome has the correct final ownership)
+                    if (owned > 0) groups[key].maxOwned = owned; 
+                }
+            });
+
+            return Object.values(groups).map(g => {
+                // Calculate weighted average price
+                const avgPrice = g.totalShares > 0 ? (g.totalValue / g.totalShares) : parseFloat(g.price);
+                
+                return {
+                    ...g,
+                    shares: g.totalShares, // Override with sum
+                    value: g.totalValue,   // Override with sum
+                    price: avgPrice,       // Override with average
+                    owned: g.maxOwned,
+                    isAggregated: g.count > 1
+                };
+            });
+        }
+
+        function createSectionHTML(title, data, cssClass) {
+            if (!data || data.length === 0) return '';
 
             let html = `
+                <div class="section-header">
+                    <h3 class="section-title ${cssClass}-title">${title}</h3>
+                </div>
+                <div class="insider-table-container">
                 <table class="insider-table">
                     <thead>
                         <tr>
-                            <th>Trade</th>
+                            <th>Date</th>
                             <th>Ticker</th>
                             <th>Company</th>
                             <th>Insider</th>
                             <th>Type</th>
-                            <th style="text-align:right">Price</th>
-                            <th style="text-align:right">Shares</th>
+                            <th style="text-align:right">Avg Price</th>
+                            <th style="text-align:right">Total Shares</th>
                             <th style="text-align:right">Owned</th>
                             <th style="text-align:center">D/I</th>
-                            <th style="text-align:right">Value</th>
+                            <th style="text-align:right">Total Value</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -349,25 +395,26 @@
                     typeLabel += ' (Deriv)';
                 }
 
-                const value = parseFloat(trade.value) || 0;
-                const price = parseFloat(trade.price) || 0;
-                const shares = parseFloat(trade.shares) || 0;
-                const owned = parseFloat(trade.owned) || 0;
-
+                const value = trade.value;
+                const price = trade.price;
+                
                 // Truncate long company names
                 const companyName = trade.company.length > 25 ? trade.company.substring(0, 22) + '...' : trade.company;
                 const insiderName = trade.insider.length > 20 ? trade.insider.substring(0, 18) + '...' : trade.insider;
 
+                // Add simple visual indicator if merged
+                const dateDisplay = trade.trade_date; 
+
                 html += `
                     <tr>
-                        <td>${trade.trade_date}</td>
+                        <td>${dateDisplay}</td>
                         <td class="col-ticker">${trade.ticker}</td>
                         <td class="col-company" title="${trade.company}">${companyName}</td>
                         <td class="col-insider" title="${trade.insider}">${insiderName}</td>
                         <td><span class="type-badge ${typeClass}">${typeLabel}</span></td>
-                        <td class="col-price">$${price.toFixed(2)}</td>
-                        <td class="col-shares">${formatNumber(shares)}</td>
-                        <td class="col-owned">${formatNumber(owned)}</td>
+                        <td class="col-price">${price > 0 ? '$' + price.toFixed(2) : '-'}</td>
+                        <td class="col-shares">${formatNumber(trade.shares)}</td>
+                        <td class="col-owned">${formatNumber(trade.owned)}</td>
                         <td class="col-di">${trade.ownership}</td>
                         <td class="col-value">${formatCurrency(value)}</td>
                     </tr>
@@ -377,34 +424,113 @@
             html += `
                     </tbody>
                 </table>
+                </div>
             `;
+            return html;
+        }
 
-            feedContainer.innerHTML = html;
+        function renderTable(data) {
+            if (data.length === 0) {
+                feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
+                return;
+            }
+
+            // 1. Aggregate Data
+            const aggregated = aggregateTransactions(data);
+
+            // 2. Sort by Value (highest impact first)
+            aggregated.sort((a, b) => b.value - a.value);
+
+            // 3. Split into Categories
+            const buys = aggregated.filter(t => t.code === 'P');
+            const sells = aggregated.filter(t => t.code === 'S');
+            const others = aggregated.filter(t => t.code !== 'P' && t.code !== 'S');
+
+            // 4. Render Sections
+            let fullHtml = '';
+            
+            // We only show sections if they match the type filter or if filter is 'all'
+            if (currentType === 'all' || currentType === 'P') {
+                fullHtml += createSectionHTML('Recent Purchases', buys, 'buy');
+            }
+            
+            if (currentType === 'all' || currentType === 'S') {
+                fullHtml += createSectionHTML('Recent Sales', sells, 'sell');
+            }
+            
+            // Only show 'Others' if type is 'all' or specifically selected (though UI currently only has Buy/Sell/All options usually)
+            if (currentType === 'all' || (currentType !== 'P' && currentType !== 'S')) {
+                fullHtml += createSectionHTML('Other Transactions', others, 'other');
+            }
+
+            if (fullHtml === '') {
+                 feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
+            } else {
+                feedContainer.innerHTML = fullHtml;
+            }
         }
 
         function renderFeed() {
-            const filtered = allData.filter(t => {
-                const val = parseFloat(t.value) || 0;
-                if (val < currentMinValue) return false;
+            // Pre-filter raw data based on Min Value before aggregation
+            // This ensures we don't aggregate small trades that should be hidden, 
+            // OR we can aggregate first then filter. 
+            // Better to filter *after* aggregation so small partial fills sum up to a large trade?
+            // Let's filter RAW data first for consistency with individual trade limits, 
+            // BUT usually users want to see "Total Purchase > $10k".
+            // Let's aggregate ALL data first, then filter by total value. This is more useful.
+            
+            let workingData = allData;
 
+            if (currentSearch) {
+                const search = currentSearch.toLowerCase();
+                workingData = workingData.filter(t => 
+                    t.ticker.toLowerCase().includes(search) || 
+                    t.company.toLowerCase().includes(search)
+                );
+            }
+
+            // Aggregate FIRST, then filter by value
+            const aggregated = aggregateTransactions(workingData);
+
+            const filtered = aggregated.filter(t => {
+                if (t.value < currentMinValue) return false;
                 if (currentType !== 'all' && t.code !== currentType) return false;
-
-                if (currentSearch) {
-                    const search = currentSearch.toLowerCase();
-                    if (!t.ticker.toLowerCase().includes(search) && !t.company.toLowerCase().includes(search)) return false;
-                }
-
                 return true;
             });
 
-            // Sort by trade_date descending (newest first)
+            // Sort by Date Descending, then Value
             filtered.sort((a, b) => {
-                const dateA = new Date(a.trade_date);
-                const dateB = new Date(b.trade_date);
-                return dateB - dateA;
+                 // Primary sort: Date
+                 const dateA = new Date(a.trade_date);
+                 const dateB = new Date(b.trade_date);
+                 if (dateB - dateA !== 0) return dateB - dateA;
+                 // Secondary sort: Value
+                 return b.value - a.value;
             });
 
-            renderTable(filtered);
+            // Now split and render (renderTable logic needs to be slightly adjusted since we already aggregated)
+            // We will modify renderTable to accept already aggregated data or handle it internally.
+            // Actually, let's keep renderTable logic clean. We will pass the FILTERED list to renderTable,
+            // but renderTable currently calls aggregateTransactions again. 
+            // Let's rewrite renderTable to NOT aggregate, and do it here.
+            
+            // RE-FACTORING FOR CLARITY:
+            // renderFeed: Filter Raw -> Aggregate -> Filter Value -> Sort -> Split & Render
+            
+            const buys = filtered.filter(t => t.code === 'P');
+            const sells = filtered.filter(t => t.code === 'S');
+            const others = filtered.filter(t => t.code !== 'P' && t.code !== 'S');
+
+            let html = '';
+            if (buys.length > 0) html += createSectionHTML('Recent Purchases', buys, 'buy');
+            if (sells.length > 0) html += createSectionHTML('Recent Sales', sells, 'sell');
+            if (others.length > 0) html += createSectionHTML('Other Transactions', others, 'other');
+
+            if (!html) {
+                 feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
+            } else {
+                feedContainer.innerHTML = html;
+            }
         }
 
         async function loadInsiderData() {
