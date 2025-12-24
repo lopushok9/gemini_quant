@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 # --- Copied and Adapted Logic from insider.py ---
 
-SEC_USER_AGENT = "InsiderTradingTracker/1.0 (contact: your-email@example.com)"
+SEC_USER_AGENT = "QuantyInsiderApp/1.0 (contact: support@quanty.app)"
 
 HEADERS = {
     "User-Agent": SEC_USER_AGENT,
@@ -165,30 +165,43 @@ def parse_form4_xml(xml_data):
 
 @app.route('/api/insider', methods=['GET'])
 def handler():
-    # Process only a small batch to avoid timeout, 
-    # Vercel functions have 10s default limit (can be 60s on Pro)
-    # We'll reduce limit to 20 for speed in serverless env
-    entries = get_recent_form4_rss(count=20) 
-    
-    all_transactions = []
-    seen = set()
-    
-    for entry in entries:
-        xml_url = get_xml_url_from_filing(entry['link'])
-        if not xml_url: continue
+    try:
+        # Process only a small batch to avoid timeout, 
+        # Vercel functions have 10s default limit (can be 60s on Pro)
+        # We'll reduce limit to 5 for speed in serverless env
+        entries = get_recent_form4_rss(count=5) 
         
-        xml_data = fetch_and_parse_xml(xml_url)
-        if not xml_data: continue
+        all_transactions = []
+        seen = set()
         
-        txs = parse_form4_xml(xml_data)
-        for t in txs:
-            sig = (t['filing_date'], t['trade_date'], t['ticker'], t['insider'], t['code'], 
-                   str(t['price']), str(t['shares']), t['ownership'])
-            if sig not in seen:
-                seen.add(sig)
-                all_transactions.append(t)
-    
-    return jsonify(all_transactions)
+        for entry in entries:
+            xml_url = get_xml_url_from_filing(entry['link'])
+            if not xml_url: continue
+            
+            xml_data = fetch_and_parse_xml(xml_url)
+            if not xml_data: continue
+            
+            txs = parse_form4_xml(xml_data)
+            for t in txs:
+                sig = (t['filing_date'], t['trade_date'], t['ticker'], t['insider'], t['code'], 
+                       str(t['price']), str(t['shares']), t['ownership'])
+                if sig not in seen:
+                    seen.add(sig)
+                    all_transactions.append(t)
+        
+        return jsonify(all_transactions)
+    except Exception as e:
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+@app.route('/api/debug', methods=['GET'])
+def debug():
+    return jsonify({
+        "status": "ok", 
+        "message": "Insider feed API is running",
+        "libraries": {
+            "lxml": "available"
+        }
+    })
 
 # Vercel expects a named handler for non-Flask, but for Flask/WSGI:
 # We just need to expose 'app'. Vercel detects WSGI apps automatically in api/ folder 
