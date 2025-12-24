@@ -163,32 +163,57 @@ def parse_form4_xml(xml_data):
 
 # --- Vercel Handler ---
 
+import concurrent.futures
+
+# ... existing imports ...
+
+# Helper to process a single RSS entry
+def process_entry(entry):
+    try:
+        xml_url = get_xml_url_from_filing(entry['link'])
+        if not xml_url: return []
+        
+        xml_data = fetch_and_parse_xml(xml_url)
+        if not xml_data: return []
+        
+        return parse_form4_xml(xml_data)
+    except:
+        return []
+
 @app.route('/api/insider', methods=['GET'])
 @app.route('/', methods=['GET'])
 def get_insider_data():
     try:
-        # Process only a small batch to avoid timeout, 
-        # Vercel functions have 10s default limit (can be 60s on Pro)
-        # We'll reduce limit to 5 for speed in serverless env
-        entries = get_recent_form4_rss(count=5) 
+        start_time = time.time()
+        # Increase limit since we are now parallel
+        # Note: 40 entries is ambitious but parallel processing handles it better
+        entries = get_recent_form4_rss(count=40) 
         
         all_transactions = []
         seen = set()
         
-        for entry in entries:
-            xml_url = get_xml_url_from_filing(entry['link'])
-            if not xml_url: continue
+        # We use a ThreadPool to fetch multiple XMLs simultaneously
+        # max_workers=5 is a safe balance to avoid SEC rate limiting (403 Forbidden)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_entry = {executor.submit(process_entry, entry): entry for entry in entries}
             
-            xml_data = fetch_and_parse_xml(xml_url)
-            if not xml_data: continue
-            
-            txs = parse_form4_xml(xml_data)
-            for t in txs:
-                sig = (t['filing_date'], t['trade_date'], t['ticker'], t['insider'], t['code'], 
-                       str(t['price']), str(t['shares']), t['ownership'])
-                if sig not in seen:
-                    seen.add(sig)
-                    all_transactions.append(t)
+            for future in concurrent.futures.as_completed(future_to_entry):
+                # Safety timeout: Vercel free tier times out at 10s. 
+                # We stop gathering results at 8.5s to ensure we have time to return JSON.
+                if time.time() - start_time > 8.5:
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    break
+                
+                try:
+                    txs = future.result()
+                    for t in txs:
+                        sig = (t['filing_date'], t['trade_date'], t['ticker'], t['insider'], t['code'], 
+                               str(t['price']), str(t['shares']), t['ownership'])
+                        if sig not in seen:
+                            seen.add(sig)
+                            all_transactions.append(t)
+                except Exception:
+                    continue
         
         return jsonify(all_transactions)
     except Exception as e:
