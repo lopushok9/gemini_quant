@@ -98,19 +98,19 @@
 
         .type-buy {
             background: rgba(0, 129, 52, 0.2);
-            color: #27d468;
+            color: #ffffff;
             border: 1px solid rgba(39, 212, 104, 0.2);
         }
 
         .type-sell {
             background: rgba(200, 50, 50, 0.2);
-            color: #ff6b6b;
+            color: #ffffff;
             border: 1px solid rgba(255, 107, 107, 0.2);
         }
 
         .type-other {
             background: rgba(100, 100, 100, 0.2);
-            color: #ccc;
+            color: #ffffff;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -149,6 +149,7 @@
             font-weight: 700;
             color: #fff;
             margin: 0;
+            text-align: left;
             letter-spacing: -0.02em;
         }
 
@@ -232,7 +233,8 @@
         <a href="/how-to-use">How to Use</a>
         <a href="/chat">Web agent</a>
         <a href="/terms">Terms</a>
-        <a href="https://github.com/lopushok9/gemini_quant" style="color: #4A90E2; border-bottom: none; margin-top: auto; font-weight: 700;">Download App</a>
+        <a href="https://github.com/lopushok9/gemini_quant"
+            style="color: #4A90E2; border-bottom: none; margin-top: auto; font-weight: 700;">Download App</a>
     </div>
 
     <script>
@@ -359,14 +361,14 @@
                     groups[key].totalValue += value;
                     groups[key].count += 1;
                     // Update owned to be the latest (heuristic: usually the entry with the latest outcome has the correct final ownership)
-                    if (owned > 0) groups[key].maxOwned = owned; 
+                    if (owned > 0) groups[key].maxOwned = owned;
                 }
             });
 
             return Object.values(groups).map(g => {
                 // Calculate weighted average price
                 const avgPrice = g.totalShares > 0 ? (g.totalValue / g.totalShares) : parseFloat(g.price);
-                
+
                 return {
                     ...g,
                     shares: g.totalShares, // Override with sum
@@ -425,13 +427,13 @@
 
                 const value = trade.value;
                 const price = trade.price;
-                
+
                 // Truncate long company names
                 const companyName = trade.company.length > 25 ? trade.company.substring(0, 22) + '...' : trade.company;
                 const insiderName = trade.insider.length > 20 ? trade.insider.substring(0, 18) + '...' : trade.insider;
 
                 // Add simple visual indicator if merged
-                const dateDisplay = trade.trade_date; 
+                const dateDisplay = trade.trade_date;
 
                 html += `
                     <tr>
@@ -476,23 +478,23 @@
 
             // 4. Render Sections
             let fullHtml = '';
-            
+
             // We only show sections if they match the type filter or if filter is 'all'
             if (currentType === 'all' || currentType === 'P') {
                 fullHtml += createSectionHTML('Recent Purchases', buys, 'buy');
             }
-            
+
             if (currentType === 'all' || currentType === 'S') {
                 fullHtml += createSectionHTML('Recent Sales', sells, 'sell');
             }
-            
+
             // Only show 'Others' if type is 'all' or specifically selected (though UI currently only has Buy/Sell/All options usually)
             if (currentType === 'all' || (currentType !== 'P' && currentType !== 'S')) {
                 fullHtml += createSectionHTML('Other Transactions', others, 'other');
             }
 
             if (fullHtml === '') {
-                 feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
+                feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
             } else {
                 feedContainer.innerHTML = fullHtml;
             }
@@ -506,13 +508,13 @@
             // Let's filter RAW data first for consistency with individual trade limits, 
             // BUT usually users want to see "Total Purchase > $10k".
             // Let's aggregate ALL data first, then filter by total value. This is more useful.
-            
+
             let workingData = allData;
 
             if (currentSearch) {
                 const search = currentSearch.toLowerCase();
-                workingData = workingData.filter(t => 
-                    t.ticker.toLowerCase().includes(search) || 
+                workingData = workingData.filter(t =>
+                    t.ticker.toLowerCase().includes(search) ||
                     t.company.toLowerCase().includes(search)
                 );
             }
@@ -528,12 +530,12 @@
 
             // Sort by Date Descending, then Value
             filtered.sort((a, b) => {
-                 // Primary sort: Date
-                 const dateA = new Date(a.trade_date);
-                 const dateB = new Date(b.trade_date);
-                 if (dateB - dateA !== 0) return dateB - dateA;
-                 // Secondary sort: Value
-                 return b.value - a.value;
+                // Primary sort: Date
+                const dateA = new Date(a.trade_date);
+                const dateB = new Date(b.trade_date);
+                if (dateB - dateA !== 0) return dateB - dateA;
+                // Secondary sort: Value
+                return b.value - a.value;
             });
 
             // Now split and render (renderTable logic needs to be slightly adjusted since we already aggregated)
@@ -541,10 +543,10 @@
             // Actually, let's keep renderTable logic clean. We will pass the FILTERED list to renderTable,
             // but renderTable currently calls aggregateTransactions again. 
             // Let's rewrite renderTable to NOT aggregate, and do it here.
-            
+
             // RE-FACTORING FOR CLARITY:
             // renderFeed: Filter Raw -> Aggregate -> Filter Value -> Sort -> Split & Render
-            
+
             const buys = filtered.filter(t => t.code === 'P');
             const sells = filtered.filter(t => t.code === 'S');
             const others = filtered.filter(t => t.code !== 'P' && t.code !== 'S');
@@ -555,7 +557,7 @@
             if (others.length > 0) html += createSectionHTML('Other Transactions', others, 'other');
 
             if (!html) {
-                 feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
+                feedContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;"><p>No trades found matching filters.</p></div>';
             } else {
                 feedContainer.innerHTML = html;
             }
