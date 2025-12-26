@@ -216,7 +216,10 @@ Real-time monitoring of SEC Form 4 filings to track executive buying and selling
 ```bash
 cd insider
 pip install requests feedparser lxml tabulate
-python3 insider.py --ticker AAPL --only-buysell
+python3 insider.py 
+ --ticker AAPL / choose ticker
+ --only-buysell / only buys or sells
+ --limit 80 / limit results
 ```
 
 *Disclaimer: This project is for educational purposes only. Always do your own research (DYOR). Trading and investing involve significant risk.*
