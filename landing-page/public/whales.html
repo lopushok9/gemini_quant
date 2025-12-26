@@ -28,8 +28,9 @@
         <div class="logo" style="color: #4a90e2;"><a href="/">Quanty</a></div>
         <div class="nav-links">
             <a href="/about">About</a>
-            <a href="/whales" class="active">Poly Whales</a>
+            <a href="/whales">Poly Whales</a>
             <a href="/insider">Insider Trades</a>
+            <a href="/terms">Terms</a>
             <a href="/how-to-use">How to Use</a>
             <a href="/chat">Web agent</a>
         </div>
@@ -301,7 +302,7 @@
             const feedContainer = document.getElementById('whalesFeed');
             // If empty, show waiting message
             if (!feedContainer.querySelector('#loadingState') && feedContainer.children.length === 0) {
-                 feedContainer.innerHTML = '<div id="loadingState" style="text-align: center; color: #999; padding: 2rem;"><p>Waiting for large trades...</p></div>';
+                feedContainer.innerHTML = '<div id="loadingState" style="text-align: center; color: #999; padding: 2rem;"><p>Waiting for large trades...</p></div>';
             }
         }
 
