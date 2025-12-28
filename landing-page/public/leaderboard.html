@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <title>Top Traders Leaderboard - Quanty</title>
+    <meta name="description"
+        content="See the most profitable Polymarket traders ranked by PnL. Track top performers across daily, weekly, monthly, and all-time periods.">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Ionicons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <div class="logo" style="color: #4a90e2;"><a href="/">Quanty</a></div>
+        <div class="nav-links">
+            <a href="/about">About</a>
+            <a href="/whales">Poly Whales</a>
+            <a href="/insider">Insider Trades</a>
+            <a href="/terms">Terms</a>
+            <a href="/how-to-use">How to Use</a>
+            <a href="/chat">Web agent</a>
+        </div>
+        <div class="nav-actions">
+            <a href="https://github.com/lopushok9/gemini_quant" class="download-btn">Download</a>
+            <button class="mobile-menu-btn" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div id="mobileBackdrop" class="mobile-menu-backdrop" onclick="toggleMenu()"></div>
+    <div id="mobileMenu" class="mobile-menu-sidebar">
+        <div class="mobile-menu-header">
+            <button class="close-menu-btn" onclick="toggleMenu()">&times;</button>
+        </div>
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/whales">Poly Whales</a>
+        <a href="/insider">Insider Trades</a>
+        <a href="/how-to-use">How to Use</a>
+        <a href="/chat">Web agent</a>
+        <a href="/terms">Terms</a>
+        <a href="https://github.com/lopushok9/gemini_quant"
+            style="color: #4A90E2; border-bottom: none; margin-top: auto; font-weight: 700;">Download App</a>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('mobileMenu').classList.toggle('active');
+            document.getElementById('mobileBackdrop').classList.toggle('active');
+            document.body.style.overflow = document.body.style.overflow === 'hidden' ? '' : 'hidden';
+        }
+    </script>
+
+    <main class="leaderboard-page-container">
+        <header class="leaderboard-header">
+            <div class="whales-nav-tabs">
+                <a href="/whales" class="whales-nav-tab">Large Trades</a>
+                <a href="/leaderboard" class="whales-nav-tab active">Top Traders</a>
+            </div>
+            <h1>Top Traders</h1>
+            <p>Most profitable Polymarket traders ranked by PnL</p>
+        </header>
+
+        <div class="leaderboard-timeframe-tabs">
+            <button class="timeframe-tab active" data-period="day">Daily</button>
+            <button class="timeframe-tab" data-period="week">Weekly</button>
+            <button class="timeframe-tab" data-period="month">Monthly</button>
+            <button class="timeframe-tab" data-period="all">All Time</button>
+        </div>
+
+        <div id="leaderboardTable" class="leaderboard-table-container">
+            <div id="loadingState" class="leaderboard-loading">
+                <div class="loading-spinner"></div>
+                <p>Loading leaderboard...</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/about">About</a>
+                <a href="/terms">Terms</a>
+                <a href="/how-to-use">How to Use</a>
+            </div>
+            <div class="copyright">
+                &copy; 2025 Quanty. DYOR.
+            </div>
+        </div>
+        <div class="footer-ca">CA: 5FYMEwjj1jHu4R2f9amsGhzGnyH2PghQ5dynW79tpump</div>
+    </footer>
+
+    <script>
+        let currentPeriod = 'day';
+        const tableContainer = document.getElementById('leaderboardTable');
+
+        // Polymarket Data API Configuration
+        const API_CONFIG = {
+            baseUrl: 'https://data-api.polymarket.com/v1/leaderboard',
+            limit: 50,
+            orderBy: 'PNL',
+            category: 'overall'
+        };
+
+        // Handle tab clicks
+        document.querySelectorAll('.timeframe-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.timeframe-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                currentPeriod = e.target.dataset.period;
+                loadLeaderboard();
+            });
+        });
+
+        function showLoading() {
+            tableContainer.innerHTML = `
+                <div class="leaderboard-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading leaderboard...</p>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            tableContainer.innerHTML = `
+                <div class="leaderboard-error">
+                    <ion-icon name="warning-outline"></ion-icon>
+                    <p>${message}</p>
+                    <button onclick="loadLeaderboard()" class="retry-btn">Retry</button>
+                </div>
+            `;
+        }
+
+        function formatPnl(value) {
+            const num = parseFloat(value) || 0;
+            const formatted = Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 0 });
+            if (num >= 0) {
+                return `<span class="pnl-positive">+$${formatted}</span>`;
+            } else {
+                return `<span class="pnl-negative">-$${formatted}</span>`;
+            }
+        }
+
+        function formatVolume(value) {
+            const num = parseFloat(value) || 0;
+            if (num >= 1000000) {
+                return `$${(num / 1000000).toFixed(1)}M`;
+            } else if (num >= 1000) {
+                return `$${(num / 1000).toFixed(1)}K`;
+            }
+            return `$${num.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+        }
+
+        function shortenAddress(address) {
+            if (!address) return 'Unknown';
+            return `${address.slice(0, 6)}...${address.slice(-4)}`;
+        }
+
+        function getRankBadge(rank) {
+            if (rank === 1) return '<span class="rank-badge rank-gold">🥇</span>';
+            if (rank === 2) return '<span class="rank-badge rank-silver">🥈</span>';
+            if (rank === 3) return '<span class="rank-badge rank-bronze">🥉</span>';
+            return `<span class="rank-badge">${rank}</span>`;
+        }
+
+        function copyToClipboard(text, element) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = element.innerText;
+                element.innerText = 'Copied!';
+                element.style.color = '#4a90e2';
+                setTimeout(() => {
+                    element.innerText = originalText;
+                    element.style.color = '';
+                }, 1000);
+            });
+        }
+
+        async function loadLeaderboard() {
+            showLoading();
+
+            try {
+                const url = new URL(API_CONFIG.baseUrl);
+                url.searchParams.set('timePeriod', currentPeriod);
+                url.searchParams.set('orderBy', API_CONFIG.orderBy);
+                url.searchParams.set('limit', API_CONFIG.limit.toString());
+                url.searchParams.set('offset', '0');
+                url.searchParams.set('category', API_CONFIG.category);
+
+                const response = await fetch(url.toString());
+
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    tableContainer.innerHTML = `
+                        <div class="leaderboard-empty">
+                            <ion-icon name="trophy-outline"></ion-icon>
+                            <p>No leaderboard data available for this period.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Filter out traders with 0 volume as requested
+                const filteredData = data.filter(row => (parseFloat(row.vol) || 0) > 0);
+
+                if (filteredData.length === 0) {
+                    tableContainer.innerHTML = `
+                        <div class="leaderboard-empty">
+                            <ion-icon name="trophy-outline"></ion-icon>
+                            <p>No traders with active volume found for this period.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                renderLeaderboard(filteredData);
+
+            } catch (error) {
+                console.error('[Leaderboard] Error:', error);
+                showError('Failed to load leaderboard. Please try again.');
+            }
+        }
+
+        function renderLeaderboard(data) {
+            let html = `
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th class="col-rank">Rank</th>
+                            <th class="col-trader">Trader</th>
+                            <th class="col-pnl">PnL</th>
+                            <th class="col-volume">Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach((row, index) => {
+                const rank = index + 1;
+                const wallet = row.proxyWallet || '';
+                const name = row.userName || shortenAddress(wallet);
+                const pnl = row.pnl || 0;
+                const volume = row.vol || 0;
+
+                html += `
+                    <tr class="leaderboard-row ${rank <= 3 ? 'top-rank' : ''}">
+                        <td class="col-rank" onclick="window.open('https://polymarket.com/profile/${wallet}', '_blank')">${getRankBadge(rank)}</td>
+                        <td class="col-trader">
+                            <div class="trader-info">
+                                <span class="trader-name" onclick="window.open('https://polymarket.com/profile/${wallet}', '_blank')">${name}</span>
+                                <span class="trader-wallet" onclick="copyToClipboard('${wallet}', this)" title="Click to copy">${shortenAddress(wallet)}</span>
+                            </div>
+                        </td>
+                        <td class="col-pnl" onclick="window.open('https://polymarket.com/profile/${wallet}', '_blank')">${formatPnl(pnl)}</td>
+                        <td class="col-volume" onclick="window.open('https://polymarket.com/profile/${wallet}', '_blank')">${formatVolume(volume)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+            tableContainer.innerHTML = html;
+        }
+
+        function openPolymarket(wallet) {
+            if (wallet) {
+                window.open(`https://polymarket.com/profile/${wallet}`, '_blank');
+            }
+        }
+
+        // Initial load
+        loadLeaderboard();
+    </script>
+</body>
+
+</html>

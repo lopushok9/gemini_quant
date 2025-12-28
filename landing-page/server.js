@@ -112,7 +112,7 @@ const scriptPath = path.join(process.cwd(), '..', 'insider', 'insider.py');
 
 function updateInsiderData() {
     if (process.env.VERCEL) return; // Не запускаем на Vercel
-    
+
     if (insiderCache.isUpdating) return;
     insiderCache.isUpdating = true;
     console.log(`[Insider] Updating data (local)...`);
@@ -159,10 +159,10 @@ app.post('/api/auth/login', async (req, res) => {
 
         const token = jwt.sign({ publicKey }, JWT_SECRET, { expiresIn: '24h' });
         res.json({ token, success: true, balance });
-    } catch (error) { 
+    } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal error' }); 
-    } 
+        res.status(500).json({ error: 'Internal error' });
+    }
 });
 
 app.get('/api/insider', (req, res) => {
@@ -184,6 +184,7 @@ app.get('/about', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 
 app.get('/terms', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'terms.html')))
 app.get('/how-to-use', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'how-to-use.html')))
 app.get('/whales', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'whales.html')))
+app.get('/leaderboard', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'leaderboard.html')))
 app.get('/insider', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'insider.html')))
 app.get('/chat', (req, res) => res.sendFile(path.join(process.cwd(), 'public', 'chat.html')))
 
@@ -192,7 +193,7 @@ const PROMPTS = { default: `You are a professional equity research analyst...` }
 app.post('/api/chat', authMiddleware, rateLimitMiddleware, async (req, res) => {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'Message required' });
-    
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.flushHeaders();
@@ -224,16 +225,20 @@ app.post('/api/chat', authMiddleware, rateLimitMiddleware, async (req, res) => {
                     try {
                         const content = JSON.parse(data).choices?.[0]?.delta?.content;
                         if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
         }
         res.end();
-    } catch (e) { 
+    } catch (e) {
         console.error('Chat error:', e);
-        res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`); 
-        res.end(); 
+        res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`);
+        res.end();
     }
 });
 
-app.listen(port, () => console.log(`Server running on port ${port}`));
+if (!process.env.VERCEL) {
+    app.listen(port, () => console.log(`Server running on port ${port}`));
+}
+
+module.exports = app;

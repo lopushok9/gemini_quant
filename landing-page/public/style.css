@@ -232,7 +232,7 @@ a:hover {
     gap: 1.5rem;
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+    box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1);
 }
 
 .mobile-menu-sidebar.active {
@@ -278,7 +278,8 @@ a:hover {
 
 .mobile-menu-sidebar a {
     font-size: 1.1rem;
-    font-family: 'DM Sans', sans-serif; /* Modern font */
+    font-family: 'DM Sans', sans-serif;
+    /* Modern font */
     font-weight: 500;
     color: #333;
     border-bottom: 1px solid #f0f0f0;
@@ -1517,6 +1518,48 @@ a:hover {
     font-weight: 400;
 }
 
+/* Whales Sub-navigation Tabs */
+.whales-nav-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.whales-nav-tab {
+    padding: 8px 20px;
+    border-radius: 20px;
+    background: #f1f5f9;
+    color: #64748b;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.whales-nav-tab:hover {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.whales-nav-tab.active {
+    background: #4A90E2;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+}
+
+@media (max-width: 600px) {
+    .whales-nav-tabs {
+        gap: 0.5rem;
+    }
+
+    .whales-nav-tab {
+        padding: 6px 14px;
+        font-size: 0.8rem;
+    }
+}
+
 .whales-feed {
     display: flex;
     flex-direction: column;
@@ -1524,6 +1567,7 @@ a:hover {
 }
 
 .whale-card {
+    position: relative;
     background: #fff;
     border: 1px solid #edeef0;
     border-radius: 16px;
@@ -1699,5 +1743,368 @@ a:hover {
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+/* Historical whale trades styling */
+.whale-card-historical {
+    opacity: 0.85;
+    border-left: 3px solid #4A90E2;
+}
+
+/* Hide wallet info for historical trades (API doesn't provide this data) */
+.whale-card-historical .whale-wallet-info {
+    display: none;
+}
+
+/* History separator */
+.whale-history-separator {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: #4A90E2;
+    font-size: 0.9rem;
+    font-weight: 500;
+    background: linear-gradient(to right, transparent, rgba(74, 144, 226, 0.08), transparent);
+    border-radius: 8px;
+    margin: 1rem 0;
+}
+
+.whale-history-separator span {
+    display: inline-block;
+    padding: 0.5rem 1.5rem;
+    background: #f8fafc;
+    border-radius: 20px;
+    border: 1px dashed #4A90E2;
+}
+
+/* ===================== */
+/* LEADERBOARD PAGE STYLES */
+/* ===================== */
+
+.leaderboard-page-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 4rem;
+    min-height: 70vh;
+}
+
+.leaderboard-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.leaderboard-header h1 {
+    font-size: 2.8rem;
+    font-family: 'DM Sans', sans-serif;
+    color: #1a1a1a;
+    margin-bottom: 0.5rem;
+}
+
+.leaderboard-header p {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+/* Timeframe Tabs */
+.leaderboard-timeframe-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.timeframe-tab {
+    padding: 10px 24px;
+    border: 1px solid #e1e4e8;
+    border-radius: 24px;
+    background: #fff;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.timeframe-tab:hover {
+    border-color: #4A90E2;
+    color: #4A90E2;
+}
+
+.timeframe-tab.active {
+    background: #4A90E2;
+    border-color: #4A90E2;
+    color: #fff;
+}
+
+/* Table Container */
+.leaderboard-table-container {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e1e4e8;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+/* Table */
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.leaderboard-table thead {
+    background: #f8fafc;
+}
+
+.leaderboard-table th {
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid #e1e4e8;
+}
+
+.leaderboard-table th.col-pnl,
+.leaderboard-table th.col-volume {
+    text-align: right;
+}
+
+.leaderboard-table td {
+    padding: 16px;
+    border-bottom: 1px solid #f0f2f5;
+    vertical-align: middle;
+}
+
+.leaderboard-table td.col-pnl,
+.leaderboard-table td.col-volume {
+    text-align: right;
+    font-family: 'Menlo', 'Monaco', monospace;
+    font-size: 0.95rem;
+}
+
+.leaderboard-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.leaderboard-row:hover {
+    background-color: #f8fafc;
+}
+
+.leaderboard-row:last-child td {
+    border-bottom: none;
+}
+
+/* Rank Badge */
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #666;
+}
+
+.rank-badge.rank-gold {
+    background: linear-gradient(135deg, #ffd700, #ffb700);
+    font-size: 1.2rem;
+}
+
+.rank-badge.rank-silver {
+    background: linear-gradient(135deg, #c0c0c0, #a0a0a0);
+    font-size: 1.2rem;
+}
+
+.rank-badge.rank-bronze {
+    background: linear-gradient(135deg, #cd7f32, #a0522d);
+    font-size: 1.2rem;
+}
+
+/* Trader Info */
+.trader-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.trader-name {
+    font-weight: 600;
+    color: #1a1a1a;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.trader-wallet {
+    font-size: 0.8rem;
+    color: #999;
+    font-family: 'Menlo', 'Monaco', monospace;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.trader-wallet:hover {
+    color: #4A90E2;
+}
+
+/* PnL Colors */
+.pnl-positive {
+    color: #16a34a;
+    font-weight: 600;
+}
+
+.pnl-negative {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+/* Loading State */
+.leaderboard-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    color: #999;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f3f4f6;
+    border-top-color: #4A90E2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Error State */
+.leaderboard-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    color: #999;
+    text-align: center;
+}
+
+.leaderboard-error ion-icon {
+    font-size: 3rem;
+    color: #f59e0b;
+    margin-bottom: 1rem;
+}
+
+.retry-btn {
+    margin-top: 1rem;
+    padding: 10px 24px;
+    background: #4A90E2;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.retry-btn:hover {
+    background: #357ABD;
+}
+
+/* Empty State */
+.leaderboard-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    color: #999;
+    text-align: center;
+}
+
+.leaderboard-empty ion-icon {
+    font-size: 3rem;
+    color: #d1d5db;
+    margin-bottom: 1rem;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+    .leaderboard-page-container {
+        padding: 2rem 1rem 3rem;
+    }
+
+    .leaderboard-header h1 {
+        font-size: 2rem;
+    }
+
+    .leaderboard-header p {
+        font-size: 0.95rem;
+    }
+
+    .leaderboard-timeframe-tabs {
+        gap: 0.4rem;
+    }
+
+    .timeframe-tab {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: 10px 8px;
+    }
+
+    .trader-info {
+        max-width: 110px;
+        /* Limit width to ensure other columns fit */
+    }
+
+    .trader-name {
+        font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+
+    .trader-wallet {
+        font-size: 0.65rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+
+    .rank-badge {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+    }
+
+    .leaderboard-table td.col-pnl,
+    .leaderboard-table td.col-volume {
+        font-size: 0.8rem;
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+
+    .leaderboard-table th {
+        font-size: 0.65rem;
+        letter-spacing: 0.2px;
     }
 }

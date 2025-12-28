@@ -138,6 +138,73 @@ export class TradeMonitor {
     console.log(`${'='.repeat(80)}\n`);
   }
 
+  private displayHistoricalTrade(
+    market: Market,
+    trade: { outcome: string; price: number; size: number; notional: number; timestamp: number }
+  ): void {
+    const isYes = trade.outcome.toLowerCase() === 'yes';
+    const isNo = trade.outcome.toLowerCase() === 'no';
+    const outcomeDisplay = isYes ? '✅ YES' : (isNo ? '❌ NO' : trade.outcome);
+    const tradeTime = new Date(trade.timestamp);
+
+    console.log(`\n${'-'.repeat(80)}`);
+    console.log(`📜 RECENT WHALE TRADE`);
+    console.log(`${'-'.repeat(80)}`);
+    console.log(`Market:      ${market.question}`);
+    console.log(`Outcome:     ${outcomeDisplay}`);
+    console.log(`Side:        🟢 BUY (Entry)`);
+    console.log(`Price:       $${trade.price.toFixed(4)} (${(trade.price * 100).toFixed(1)}%)`);
+    console.log(`Size:        ${trade.size.toLocaleString()} shares`);
+    console.log(`Value:       $${trade.notional.toLocaleString(undefined, { minimumFractionDigits: 2 })}`);
+    console.log(`Time:        ${tradeTime.toLocaleString()}`);
+    console.log(`${'-'.repeat(80)}`);
+  }
+
+  /**
+   * Loads and displays recent large trades as history when the monitor starts.
+   * This gives users immediate context instead of an empty screen.
+   */
+  private async loadRecentTrades(): Promise<void> {
+    console.log('\n[Monitor] Loading recent whale trades history...');
+
+    try {
+      const recentTrades = await this.api.fetchRecentLargeTrades(
+        this.minTradeSize,
+        config.minPrice,
+        config.maxPrice,
+        10 // Load last 10 trades
+      );
+
+      if (recentTrades.length === 0) {
+        console.log('[Monitor] No recent whale trades found matching your criteria.');
+        return;
+      }
+
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`📊 RECENT WHALE ACTIVITY (Last ${recentTrades.length} trades)`);
+      console.log(`${'='.repeat(80)}`);
+
+      // Display trades in reverse order (oldest first) so newest appears at bottom
+      const tradesInOrder = [...recentTrades].reverse();
+
+      for (const { market, trade } of tradesInOrder) {
+        this.displayHistoricalTrade(market, {
+          outcome: trade.outcome,
+          price: trade.price,
+          size: trade.size,
+          notional: trade.notional,
+          timestamp: trade.timestamp,
+        });
+      }
+
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`✅ History loaded. Now monitoring for live trades...`);
+      console.log(`${'='.repeat(80)}\n`);
+    } catch (error) {
+      console.error('[Monitor] Error loading recent trades:', error);
+    }
+  }
+
   async start(): Promise<void> {
     if (this.isRunning) return;
 
@@ -155,10 +222,13 @@ export class TradeMonitor {
     // 1. Initial market metadata fetch
     await this.api.fetchAllActiveMarkets();
 
-    // 2. Start WebSocket connection
+    // 2. Load and display recent trades history
+    await this.loadRecentTrades();
+
+    // 3. Start WebSocket connection for live trades
     this.connectToWebSocket();
 
-    // 3. Periodic volume scanning (disabled as per user request to focus on individual trades)
+    // 4. Periodic volume scanning (disabled as per user request to focus on individual trades)
     // this.startVolumeMonitoring();
   }
 

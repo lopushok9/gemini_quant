@@ -69,6 +69,10 @@
 
     <main class="whales-page-container">
         <header class="whales-header">
+            <div class="whales-nav-tabs">
+                <a href="/whales" class="whales-nav-tab active">Large Trades</a>
+                <a href="/leaderboard" class="whales-nav-tab">Top Traders</a>
+            </div>
             <h1>Poly Whales</h1>
             <p>Real-time large positions from Polymarket </p>
         </header>
@@ -295,14 +299,149 @@
             };
         }
 
-        // Initial load of recent trades
+        // Initial load of recent trades from Polymarket Data API
         let lastLoadId = 0;
         async function loadInitialTrades() {
-            console.log('[Whales] History loading disabled. Waiting for live trades...');
-            const feedContainer = document.getElementById('whalesFeed');
-            // If empty, show waiting message
-            if (!feedContainer.querySelector('#loadingState') && feedContainer.children.length === 0) {
-                feedContainer.innerHTML = '<div id="loadingState" style="text-align: center; color: #999; padding: 2rem;"><p>Waiting for large trades...</p></div>';
+            const currentLoadId = ++lastLoadId;
+            console.log('[Whales] Loading historical trades...');
+
+            try {
+                removeLoadingState();
+                feedContainer.innerHTML = '<div id="loadingState" style="text-align: center; color: #999; padding: 2rem;"><p>Loading whale history...</p></div>';
+
+                let loadedCount = 0;
+                const maxHistoryTrades = 10;
+                const allTrades = [];
+
+                // Fetch trades in batches until we have enough or run out
+                // Start from now and go backwards up to 6 hours
+                const nowSec = Math.floor(Date.now() / 1000);
+                const sixHoursAgoSec = nowSec - (6 * 60 * 60);
+
+                // First batch: most recent trades
+                const batchUrls = [
+                    `https://data-api.polymarket.com/trades?limit=1000`,
+                    `https://data-api.polymarket.com/trades?limit=1000&before=${nowSec - 3600}`, // 1h ago
+                    `https://data-api.polymarket.com/trades?limit=1000&before=${nowSec - 7200}`, // 2h ago
+                ];
+
+                // Fetch batches in parallel
+                const responses = await Promise.allSettled(
+                    batchUrls.map(url => fetch(url).then(r => r.ok ? r.json() : []))
+                );
+
+                // Check if this load is still relevant
+                if (currentLoadId !== lastLoadId) return;
+
+                // Collect all trades from successful responses
+                for (const result of responses) {
+                    if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+                        allTrades.push(...result.value);
+                    }
+                }
+
+                console.log(`[Whales] Fetched ${allTrades.length} total trades from API`);
+
+                // Remove duplicates by trade ID/hash
+                const seen = new Set();
+                const uniqueTrades = allTrades.filter(t => {
+                    const key = t.id || t.transaction_hash || `${t.asset_id}-${t.match_time}-${t.size}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+
+                // Sort by timestamp descending (newest first)
+                uniqueTrades.sort((a, b) => {
+                    const tsA = new Date(a.match_time || a.timestamp || 0).getTime();
+                    const tsB = new Date(b.match_time || b.timestamp || 0).getTime();
+                    return tsB - tsA;
+                });
+
+                console.log(`[Whales] ${uniqueTrades.length} unique trades after deduplication`);
+
+                // Clear loading state
+                removeLoadingState();
+
+                for (const trade of uniqueTrades) {
+                    if (loadedCount >= maxHistoryTrades) break;
+
+                    const price = parseFloat(trade.price || '0');
+                    const size = parseFloat(trade.size || '0');
+                    const notional = size * price;
+                    const outcome = (trade.outcome || '').toLowerCase();
+                    const side = (trade.side || '').toUpperCase();
+                    const conditionId = trade.conditionId || trade.condition_id || trade.market;
+
+                    // Apply filters: BUY side, minimum size, outcome, probability
+                    const matchesSize = notional >= currentMinSize;
+                    const matchesOutcome = currentOutcome === 'all' || outcome === currentOutcome;
+                    const matchesProb = currentProbMode === 'all' || (price >= 0.10 && price <= 0.90);
+
+                    if (side === 'BUY' && matchesSize && matchesOutcome && matchesProb && conditionId) {
+                        const market = await fetchMarketDetails(conditionId);
+
+                        // Check if still relevant after async call
+                        if (currentLoadId !== lastLoadId) return;
+
+                        // Search filter and market validity check
+                        const matchesSearch = !currentSearch || market?.question?.toLowerCase().includes(currentSearch);
+
+                        if (market && !market.closed && matchesSearch) {
+                            // Parse timestamp properly
+                            let timestamp = trade.match_time || trade.created_at || trade.timestamp;
+                            if (timestamp) {
+                                // If it's a string date, parse it
+                                if (typeof timestamp === 'string' && timestamp.includes('-')) {
+                                    timestamp = new Date(timestamp).getTime();
+                                } else {
+                                    const numTs = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
+                                    timestamp = numTs < 10000000000 ? numTs * 1000 : numTs;
+                                }
+                            } else {
+                                timestamp = Date.now();
+                            }
+
+                            const formattedTrade = {
+                                ...trade,
+                                conditionId: conditionId,
+                                size: size,
+                                price: price,
+                                outcome: trade.outcome || 'Unknown',
+                                proxyWallet: trade.owner || trade.maker_address || trade.taker_address || 'Unknown',
+                                timestamp: timestamp
+                            };
+
+                            const card = createWhaleCard(formattedTrade, market);
+                            // Add a subtle indicator that this is historical
+                            card.classList.add('whale-card-historical');
+                            feedContainer.appendChild(card);
+                            loadedCount++;
+                        }
+                    }
+                }
+
+                // If we loaded history, add a separator before live trades
+                if (loadedCount > 0) {
+                    const separator = document.createElement('div');
+                    separator.className = 'whale-history-separator';
+                    separator.innerHTML = '<span>History loaded — Live trades will appear above</span>';
+                    feedContainer.appendChild(separator);
+                } else {
+                    // If no history found, show waiting message
+                    if (!feedContainer.querySelector('#loadingState') && feedContainer.children.length === 0) {
+                        feedContainer.innerHTML = '<div id="loadingState" style="text-align: center; color: #999; padding: 2rem;"><p>No recent whale trades found matching $' + currentMinSize.toLocaleString() + '+ filter. Waiting for live trades...</p></div>';
+                    }
+                }
+
+                console.log(`[Whales] Loaded ${loadedCount} historical trades`);
+
+            } catch (error) {
+                console.error('[Whales] Error loading history:', error);
+                // Show waiting message on error
+                if (!feedContainer.querySelector('#loadingState') && feedContainer.children.length === 0) {
+                    feedContainer.innerHTML = '<div id="loadingState" style="text-align: center; color: #999; padding: 2rem;"><p>Waiting for large trades...</p></div>';
+                }
             }
         }
 
