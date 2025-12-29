@@ -58,5 +58,5 @@ Do not emit Markdown, extra text, or additional properties.
 
 Presentation guideline
 The reasoning field must be highly readable and well-structured. Use short paragraphs, natural line breaks, and clear separation between sections (e.g., data summary, higher-timeframe analysis, intraday confirmation, risk considerations, final conclusion) to make the text easy to follow. Avoid walls of text, dense blocks, or excessive bold/italic markup (no ** or __ at all). Write in a professional, clean narrative style that flows logically and is pleasant to read.
-The table must have the columns: Asset, Action, Position Size (% of portfolio), Take Profit, Stop Loss. 
+
 
