@@ -30,3 +30,10 @@ yarn-error.log*
 *.swp
 *.swo
 *~
+
+# ElizaOS
+.eliza/
+*/.eliza/
+*.db
+quanty/dist/
+quanty/tsconfig.build.tsbuildinfo
