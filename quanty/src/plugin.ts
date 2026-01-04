@@ -32,11 +32,13 @@ const helloWorldAction: Action = {
   validate: async () => true,
   handler: async (runtime, message, state, options, callback) => {
     try {
-      await callback({
-        text: 'hello world!',
-        actions: ['HELLO_WORLD'],
-        source: message.content.source,
-      });
+      if (callback) {
+        await callback({
+          text: 'hello world!',
+          actions: ['HELLO_WORLD'],
+          source: message.content.source,
+        });
+      }
       return { text: 'Sent hello world greeting', success: true };
     } catch (error) {
       return { text: 'Failed', success: false };
@@ -65,27 +67,27 @@ const getPriceAction: Action = {
       let symbol = words.find(w => w.length >= 2 && w.length <= 10 && !['price', 'check', 'get', 'what', 'is'].includes(w));
 
       if (!symbol) {
-        await callback({ text: "I couldn't identify the coin symbol. Could you specify which token you want to check? (e.g., 'price BTC')" });
+        if (callback) await callback({ text: "I couldn't identify the coin symbol. Could you specify which token you want to check? (e.g., 'price BTC')" });
         return { text: 'Missing symbol', success: false };
       }
 
       // Search for ID
       const searchRes = await fetch(`https://api.coingecko.com/api/v3/search?query=${symbol}`);
-      const searchData = await searchRes.json();
+      const searchData = (await searchRes.json()) as any;
       const coin = searchData.coins?.[0];
 
       if (!coin) {
-        await callback({ text: `I couldn't find any coin matching '${symbol}' on CoinGecko.` });
+        if (callback) await callback({ text: `I couldn't find any coin matching '${symbol}' on CoinGecko.` });
         return { text: 'Coin not found', success: false };
       }
 
       // Fetch Price
       const priceRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`);
-      const priceData = await priceRes.json();
+      const priceData = (await priceRes.json()) as any;
       const data = priceData[coin.id];
 
       if (!data) {
-        await callback({ text: `I found ${coin.name}, but couldn't retrieve price data for it right now.` });
+        if (callback) await callback({ text: `I found ${coin.name}, but couldn't retrieve price data for it right now.` });
         return { text: 'Price data missing', success: false };
       }
 
@@ -99,10 +101,10 @@ const getPriceAction: Action = {
         `24h VOLUME: $${data.usd_24h_vol?.toLocaleString()}\n\n` +
         `IMPORTANT DISCLAIMER: Data provided by CoinGecko Public API. Not financial advice.`;
 
-      await callback({ text: responseText, source: message.content.source });
+      if (callback) await callback({ text: responseText, source: message.content.source });
       return { text: `Fetched price for ${coin.name}`, success: true };
     } catch (error) {
-      await callback({ text: "Error fetching market data. Try again later." });
+      if (callback) await callback({ text: "Error fetching market data. Try again later." });
       return { text: 'Error', success: false };
     }
   },
@@ -114,6 +116,70 @@ const getPriceAction: Action = {
   ],
 };
 
+/**
+ * GetMemePrice Action (DexScreener API)
+ */
+const getMemePriceAction: Action = {
+  name: 'GET_MEME_PRICE',
+  similes: ['DEX_PRICE', 'CHECK_DEX', 'ONCHAIN_DATA', 'MEME_PRICE', 'DEXSCREENER'],
+  description: 'Fetch real-time on-chain data and prices for meme coins and DEX pairs via DexScreener',
+  validate: async () => true,
+  handler: async (runtime, message, state, options, callback) => {
+    try {
+      const text = (message.content.text || '').toLowerCase();
+      const words = text.split(/\s+/);
+      let symbol = words.find(w => w.length >= 2 && w.length <= 15 && !['price', 'check', 'get', 'what', 'is', 'dex'].includes(w));
+
+      if (!symbol) {
+        if (callback) await callback({ text: "I need a token symbol or address to check on DexScreener. (e.g., 'dex PEPE' or address)" });
+        return { text: 'Missing symbol', success: false };
+      }
+
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${symbol}`);
+      const data = (await res.json()) as any;
+
+      if (!data.pairs || data.pairs.length === 0) {
+        if (callback) await callback({ text: `I couldn't find any active trading pairs for '${symbol}' on DexScreener.` });
+        return { text: 'No pairs found', success: false };
+      }
+
+      // Sort by liquidity to find the most "real" pair
+      const bestPair = data.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+
+      const price = bestPair.priceUsd;
+      const liquidity = bestPair.liquidity?.usd?.toLocaleString();
+      const volume = bestPair.volume?.h24?.toLocaleString();
+      const fdv = bestPair.fdv?.toLocaleString();
+      const m5 = bestPair.priceChange?.m5;
+      const h1 = bestPair.priceChange?.h1;
+      const h24 = bestPair.priceChange?.h24;
+
+      const responseText = `TOKEN: ${bestPair.baseToken.name} (${bestPair.baseToken.symbol})\n` +
+        `CHAIN: ${bestPair.chainId} | DEX: ${bestPair.dexId}\n` +
+        `PRICE: $${price}\n` +
+        `LIQUIDITY: $${liquidity}\n` +
+        `FDV: $${fdv}\n` +
+        `24h VOLUME: $${volume}\n\n` +
+        `PRICE CHANGE:\n` +
+        `5m: ${m5}% | 1h: ${h1}% | 24h: ${h24}%\n\n` +
+        `CA: ${bestPair.baseToken.address}\n\n` +
+        `IMPORTANT: This is on-chain data from DexScreener. Not financial advice.`;
+
+      if (callback) await callback({ text: responseText, source: message.content.source });
+      return { text: `Fetched DexScreener data for ${bestPair.baseToken.symbol}`, success: true };
+    } catch (error) {
+      if (callback) await callback({ text: "Error fetching data from DexScreener. Please try again." });
+      return { text: 'Error', success: false };
+    }
+  },
+  examples: [
+    [
+      { name: '{{name1}}', content: { text: "check price of PEPE on dex" } },
+      { name: 'Quanty', content: { text: "TOKEN: Pepe (PEPE)\nCHAIN: ethereum...\nPRICE: $0.00001...", actions: ['GET_MEME_PRICE'] } }
+    ],
+  ],
+};
+
 const helloWorldProvider: Provider = {
   name: 'HELLO_WORLD_PROVIDER',
   get: async () => ({ text: 'Standard analytics provider active.', values: {}, data: {} }),
@@ -121,8 +187,10 @@ const helloWorldProvider: Provider = {
 
 export class StarterService extends Service {
   static serviceType = 'starter';
+  capabilityDescription = 'Quanty core market data service';
   static async start(runtime: IAgentRuntime) { return new StarterService(runtime); }
   static async stop(runtime: IAgentRuntime) { }
+  async stop() { }
 }
 
 const plugin: Plugin = {
@@ -144,7 +212,7 @@ const plugin: Plugin = {
     },
   ],
   services: [StarterService],
-  actions: [helloWorldAction, getPriceAction],
+  actions: [helloWorldAction, getPriceAction, getMemePriceAction],
   providers: [helloWorldProvider],
 };
 
