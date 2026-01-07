@@ -23,36 +23,6 @@ const configSchema = z.object({
 });
 
 /**
- * HelloWorld Action
- */
-const helloWorldAction: Action = {
-  name: 'HELLO_WORLD',
-  similes: ['GREET', 'SAY_HELLO'],
-  description: 'Responds with a simple hello world message',
-  validate: async () => true,
-  handler: async (runtime, message, state, options, callback) => {
-    try {
-      if (callback) {
-        await callback({
-          text: 'hello world!',
-          actions: ['HELLO_WORLD'],
-          source: message.content.source,
-        });
-      }
-      return { text: 'Sent hello world greeting', success: true };
-    } catch (error) {
-      return { text: 'Failed', success: false };
-    }
-  },
-  examples: [
-    [
-      { name: '{{name1}}', content: { text: 'say hello' } },
-      { name: '{{name2}}', content: { text: 'hello world!', actions: ['HELLO_WORLD'] } },
-    ],
-  ],
-};
-
-/**
  * GetPrice Action (CoinGecko Public API)
  */
 const getPriceAction: Action = {
@@ -62,56 +32,72 @@ const getPriceAction: Action = {
   validate: async () => true,
   handler: async (runtime, message, state, options, callback) => {
     try {
-      const text = (message.content.text || '').toLowerCase();
-      const words = text.split(/\s+/);
-      let symbol = words.find(w => w.length >= 2 && w.length <= 10 && !['price', 'check', 'get', 'what', 'is'].includes(w));
+      const originalText = (message.content.text || '').trim();
+      const textLow = originalText.toLowerCase();
+
+      const blacklist = new Set([
+        'price', 'check', 'get', 'what', 'is', 'for', 'the', 'analyze', 'of', 'tell',
+        'about', 'now', 'please', 'allow', 'moment', 'data', 'how', 'much',
+        'you', 'can', 'find', 'show', 'give', 'me', 'market', 'crypto', 'asset'
+      ]);
+
+      const capsMatch = originalText.match(/\b[A-Z]{2,10}\b/g);
+      const dollarMatch = originalText.match(/\$[a-zA-Z]{2,10}/g);
+
+      let symbol = '';
+      if (dollarMatch) {
+        symbol = dollarMatch[0].substring(1).toLowerCase();
+      } else if (capsMatch) {
+        const validCaps = capsMatch.filter(w => !blacklist.has(w.toLowerCase()));
+        if (validCaps.length > 0) symbol = validCaps[0].toLowerCase();
+      }
 
       if (!symbol) {
-        if (callback) await callback({ text: "I couldn't identify the coin symbol. Could you specify which token you want to check? (e.g., 'price BTC')" });
+        const words = textLow.split(/[\s,!?]+/);
+        symbol = words.find(w => w.length >= 2 && w.length <= 10 && !blacklist.has(w)) || '';
+      }
+
+      if (!symbol) {
+        if (callback) await callback({ text: "I couldn't identify the ticker. Please specify (e.g. BTC)." });
         return { text: 'Missing symbol', success: false };
       }
 
-      // Search for ID
-      const searchRes = await fetch(`https://api.coingecko.com/api/v3/search?query=${symbol}`);
-      const searchData = (await searchRes.json()) as any;
-      const coin = searchData.coins?.[0];
+      const majorCoins: Record<string, string> = {
+        'btc': 'bitcoin', 'eth': 'ethereum', 'sol': 'solana', 'bnb': 'binancecoin',
+        'xrp': 'ripple', 'ada': 'cardano', 'doge': 'dogecoin', 'dot': 'polkadot',
+        'pepe': 'pepe', 'link': 'chainlink', 'trx': 'tron', 'ton': 'the-open-network', 'shib': 'shiba-inu'
+      };
 
-      if (!coin) {
-        if (callback) await callback({ text: `I couldn't find any coin matching '${symbol}' on CoinGecko.` });
-        return { text: 'Coin not found', success: false };
+      let coinId = majorCoins[symbol];
+      if (!coinId) {
+        const searchRes = await fetch(`https://api.coingecko.com/api/v3/search?query=${symbol}`);
+        const searchData = (await searchRes.json()) as any;
+        const exactMatch = searchData.coins?.find((c: any) => c.symbol.toLowerCase() === symbol);
+        const coin = exactMatch || searchData.coins?.[0];
+        if (!coin) {
+          if (callback) await callback({ text: `Asset '${symbol}' not found.` });
+          return { text: 'Not found', success: false };
+        }
+        coinId = coin.id;
       }
 
-      // Fetch Price
-      const priceRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`);
+      const priceRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`);
       const priceData = (await priceRes.json()) as any;
-      const data = priceData[coin.id];
+      const data = priceData[coinId];
 
-      if (!data) {
-        if (callback) await callback({ text: `I found ${coin.name}, but couldn't retrieve price data for it right now.` });
-        return { text: 'Price data missing', success: false };
-      }
+      if (!data) return { text: 'Fetch failed', success: false };
 
-      const change = data.usd_24h_change?.toFixed(2);
-      const direction = data.usd_24h_change >= 0 ? '📈' : '📉';
-
-      const responseText = `${coin.name} (${coin.symbol})\n` +
-        `PRICE: $${data.usd.toLocaleString()}\n` +
-        `24h CHANGE: ${direction} ${change}%\n` +
-        `MARKET CAP: $${data.usd_market_cap?.toLocaleString()}\n` +
-        `24h VOLUME: $${data.usd_24h_vol?.toLocaleString()}\n\n` +
-        `IMPORTANT DISCLAIMER: Data provided by CoinGecko Public API. Not financial advice.`;
-
+      const responseText = `[DATA FETCHED]: ${coinId.toUpperCase()} | PRICE: $${data.usd.toLocaleString()} | 24h: ${data.usd_24h_change?.toFixed(2)}% | MCAP: $${(data.usd_market_cap || 0).toLocaleString()}`;
       if (callback) await callback({ text: responseText, source: message.content.source });
-      return { text: `Fetched price for ${coin.name}`, success: true };
+      return { text: `Success: ${coinId}`, data: { ...data, symbol, id: coinId }, success: true };
     } catch (error) {
-      if (callback) await callback({ text: "Error fetching market data. Try again later." });
       return { text: 'Error', success: false };
     }
   },
   examples: [
     [
-      { name: '{{name1}}', content: { text: "What's the price of BTC?" } },
-      { name: 'Quanty', content: { text: "Bitcoin (BTC)\nPRICE: $96,000...", actions: ['GET_PRICE'] } }
+      { name: '{{name1}}', content: { text: "Price of BTC" } },
+      { name: 'Quanty', content: { text: "[DATA FETCHED]: BITCOIN...", actions: ['GET_PRICE'] } }
     ],
   ],
 };
@@ -122,62 +108,56 @@ const getPriceAction: Action = {
 const getMemePriceAction: Action = {
   name: 'GET_MEME_PRICE',
   similes: ['DEX_PRICE', 'CHECK_DEX', 'ONCHAIN_DATA', 'MEME_PRICE', 'DEXSCREENER'],
-  description: 'Fetch real-time on-chain data and prices for meme coins and DEX pairs via DexScreener',
+  description: 'Fetch real-time on-chain data for meme coins via DexScreener',
   validate: async () => true,
   handler: async (runtime, message, state, options, callback) => {
     try {
-      const text = (message.content.text || '').toLowerCase();
-      const words = text.split(/\s+/);
-      let symbol = words.find(w => w.length >= 2 && w.length <= 15 && !['price', 'check', 'get', 'what', 'is', 'dex'].includes(w));
+      const originalText = (message.content.text || '').trim();
+      const words = originalText.split(/[\s,!?]+/);
+      const blacklist = new Set(['dex', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze', 'pepe']);
 
+      let symbol = words.find(w => w.startsWith('$'))?.substring(1).toLowerCase();
       if (!symbol) {
-        if (callback) await callback({ text: "I need a token symbol or address to check on DexScreener. (e.g., 'dex PEPE' or address)" });
-        return { text: 'Missing symbol', success: false };
+        symbol = words.find(w => (w.length >= 2 && w.length <= 44) && !blacklist.has(w.toLowerCase()));
       }
+
+      if (!symbol) return { text: 'Missing symbol', success: false };
 
       const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${symbol}`);
       const data = (await res.json()) as any;
 
-      if (!data.pairs || data.pairs.length === 0) {
-        if (callback) await callback({ text: `I couldn't find any active trading pairs for '${symbol}' on DexScreener.` });
-        return { text: 'No pairs found', success: false };
-      }
+      if (!data.pairs || data.pairs.length === 0) return { text: 'No pairs', success: false };
 
-      // Sort by liquidity to find the most "real" pair
       const bestPair = data.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-
-      const price = bestPair.priceUsd;
-      const liquidity = bestPair.liquidity?.usd?.toLocaleString();
-      const volume = bestPair.volume?.h24?.toLocaleString();
-      const fdv = bestPair.fdv?.toLocaleString();
-      const m5 = bestPair.priceChange?.m5;
-      const h1 = bestPair.priceChange?.h1;
-      const h24 = bestPair.priceChange?.h24;
-
-      const responseText = `TOKEN: ${bestPair.baseToken.name} (${bestPair.baseToken.symbol})\n` +
-        `CHAIN: ${bestPair.chainId} | DEX: ${bestPair.dexId}\n` +
-        `PRICE: $${price}\n` +
-        `LIQUIDITY: $${liquidity}\n` +
-        `FDV: $${fdv}\n` +
-        `24h VOLUME: $${volume}\n\n` +
-        `PRICE CHANGE:\n` +
-        `5m: ${m5}% | 1h: ${h1}% | 24h: ${h24}%\n\n` +
-        `CA: ${bestPair.baseToken.address}\n\n` +
-        `IMPORTANT: This is on-chain data from DexScreener. Not financial advice.`;
+      const responseText = `[ON-CHAIN DATA]: ${bestPair.baseToken.symbol} | PRICE: $${bestPair.priceUsd} | LIQ: $${(bestPair.liquidity?.usd || 0).toLocaleString()} | 24h: ${bestPair.priceChange?.h24}%`;
 
       if (callback) await callback({ text: responseText, source: message.content.source });
-      return { text: `Fetched DexScreener data for ${bestPair.baseToken.symbol}`, success: true };
+      return { text: `Success: ${bestPair.baseToken.symbol}`, data: bestPair, success: true };
     } catch (error) {
-      if (callback) await callback({ text: "Error fetching data from DexScreener. Please try again." });
       return { text: 'Error', success: false };
     }
   },
   examples: [
     [
-      { name: '{{name1}}', content: { text: "check price of PEPE on dex" } },
-      { name: 'Quanty', content: { text: "TOKEN: Pepe (PEPE)\nCHAIN: ethereum...\nPRICE: $0.00001...", actions: ['GET_MEME_PRICE'] } }
+      { name: '{{name1}}', content: { text: "check PEPE" } },
+      { name: 'Quanty', content: { text: "[ON-CHAIN DATA]: PEPE...", actions: ['GET_MEME_PRICE'] } }
     ],
   ],
+};
+
+/**
+ * HelloWorld Action
+ */
+const helloWorldAction: Action = {
+  name: 'HELLO_WORLD',
+  similes: ['GREET', 'SAY_HELLO'],
+  description: 'Responds with simple hello',
+  validate: async () => true,
+  handler: async (runtime, message, state, options, callback) => {
+    if (callback) await callback({ text: 'hello world!', actions: ['HELLO_WORLD'], source: message.content.source });
+    return { text: 'Sent', success: true };
+  },
+  examples: [[{ name: '{{name1}}', content: { text: 'hello' } }, { name: '{{name2}}', content: { text: 'hello!', actions: ['HELLO_WORLD'] } }]],
 };
 
 const helloWorldProvider: Provider = {
@@ -195,22 +175,10 @@ export class StarterService extends Service {
 
 const plugin: Plugin = {
   name: 'starter',
-  description: 'Main Quanty plugin for market intelligence',
   priority: 0,
+  description: 'Main Quanty plugin for market intelligence',
   config: { EXAMPLE_PLUGIN_VARIABLE: process.env.EXAMPLE_PLUGIN_VARIABLE },
   async init(config) { },
-  models: {
-    [ModelType.TEXT_SMALL]: async () => 'Quanty analyzing...',
-    [ModelType.TEXT_LARGE]: async () => 'Quanty strategic analysis complete.',
-  },
-  routes: [
-    {
-      name: 'status',
-      path: '/status',
-      type: 'GET',
-      handler: async (req, res) => { res.json({ status: 'active', agent: 'Quanty' }); },
-    },
-  ],
   services: [StarterService],
   actions: [helloWorldAction, getPriceAction, getMemePriceAction],
   providers: [helloWorldProvider],
