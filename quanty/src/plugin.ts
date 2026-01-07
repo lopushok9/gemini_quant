@@ -23,6 +23,71 @@ const configSchema = z.object({
 });
 
 /**
+ * GetStockPrice Action (Yahoo Finance Public API)
+ */
+const getStockPriceAction: Action = {
+  name: 'GET_STOCK_PRICE',
+  similes: ['STOCK_PRICE', 'EQUITY_PRICE', 'CHECK_STOCK', 'MARKET_QUOTE'],
+  description: 'Fetch real-time stock price data for equities (NVDA, AAPL, etc.) via Yahoo Finance',
+  validate: async () => true,
+  handler: async (runtime, message, state, options, callback) => {
+    try {
+      const originalText = (message.content.text || '').trim();
+      const words = originalText.split(/[\s,!?]+/);
+      const blacklist = new Set(['stock', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze', 'equity']);
+
+      let symbol = words.find(w => w.startsWith('$'))?.substring(1).toUpperCase();
+      if (!symbol) {
+        symbol = words.find(w => w.length >= 1 && w.length <= 5 && /^[A-Z]+$/.test(w) && !blacklist.has(w.toLowerCase()));
+      }
+      // Fallback to lowercase check if no uppercase match
+      if (!symbol) {
+        symbol = words.find(w => w.length >= 1 && w.length <= 5 && !blacklist.has(w.toLowerCase()))?.toUpperCase() || '';
+      }
+
+      if (!symbol) {
+        if (callback) await callback({ text: "I couldn't identify the stock ticker. Please specify it (e.g. NVDA or $AAPL)." });
+        return { text: 'Missing symbol', success: false };
+      }
+
+      // Yahoo Finance API (Public chart endpoint)
+      const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`);
+      const data = (await res.json()) as any;
+
+      const result = data.chart?.result?.[0];
+      if (!result) {
+        if (callback) await callback({ text: `Could not find stock data for '${symbol}'. Make sure it's a valid ticker.` });
+        return { text: 'Not found', success: false };
+      }
+
+      const meta = result.meta;
+      const price = meta.regularMarketPrice;
+      const prevClose = meta.previousClose;
+      const change = price - prevClose;
+      const changePercent = (change / prevClose) * 100;
+
+      const responseText = `[STOCK DATA FETCHED]: ${symbol}\n` +
+        `PRICE: $${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}\n` +
+        `CHANGE: ${change >= 0 ? '📈' : '📉'} ${change.toFixed(2)} (${changePercent.toFixed(2)}%)\n` +
+        `MARKET: ${meta.exchangeName}\n\n` +
+        `Processing equity research analysis...`;
+
+      if (callback) await callback({ text: responseText, source: message.content.source });
+      return { text: `Success: ${symbol}`, data: { symbol, price, change, changePercent, meta }, success: true };
+    } catch (error) {
+      if (callback) await callback({ text: "Error connecting to market data provider." });
+      return { text: 'Error', success: false };
+    }
+  },
+  examples: [
+    [
+      { name: '{{name1}}', content: { text: "Price of NVDA" } },
+      { name: 'Quanty', content: { text: "[STOCK DATA FETCHED]: NVDA...", actions: ['GET_STOCK_PRICE'] } }
+    ],
+  ],
+};
+
+/**
  * GetPrice Action (CoinGecko Public API)
  */
 const getPriceAction: Action = {
@@ -58,7 +123,7 @@ const getPriceAction: Action = {
       }
 
       if (!symbol) {
-        if (callback) await callback({ text: "I couldn't identify the ticker. Please specify (e.g. BTC)." });
+        if (callback) await callback({ text: "I couldn't identify the ticker clearly. Please specify it (e.g. BTC)." });
         return { text: 'Missing symbol', success: false };
       }
 
@@ -114,7 +179,7 @@ const getMemePriceAction: Action = {
     try {
       const originalText = (message.content.text || '').trim();
       const words = originalText.split(/[\s,!?]+/);
-      const blacklist = new Set(['dex', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze', 'pepe']);
+      const blacklist = new Set(['dex', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze']);
 
       let symbol = words.find(w => w.startsWith('$'))?.substring(1).toLowerCase();
       if (!symbol) {
@@ -180,7 +245,7 @@ const plugin: Plugin = {
   config: { EXAMPLE_PLUGIN_VARIABLE: process.env.EXAMPLE_PLUGIN_VARIABLE },
   async init(config) { },
   services: [StarterService],
-  actions: [helloWorldAction, getPriceAction, getMemePriceAction],
+  actions: [helloWorldAction, getPriceAction, getMemePriceAction, getStockPriceAction],
   providers: [helloWorldProvider],
 };
 
