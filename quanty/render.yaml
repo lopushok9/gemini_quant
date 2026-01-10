@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: quanty
+    env: bun
+    buildCommand: bun install && bun run build
+    startCommand: bun run start
+    envVars:
+      - key: SERVER_PORT
+        value: 3000

@@ -41,16 +41,36 @@ async function build() {
             'fs',
             'path',
             'https',
+            'http',
             'node:*',
             '@elizaos/core',
             '@elizaos/plugin-bootstrap',
             '@elizaos/plugin-sql',
             '@elizaos/cli',
+            '@elizaos/server',
+            '@elizaos/client',
             'zod',
+            'cors',
+            'pg',
           ],
           naming: {
             entry: '[dir]/[name].[ext]',
           },
+          plugins: [
+            {
+              name: 'path-alias-resolver',
+              setup(build) {
+                build.onResolve({ filter: /^@\// }, (args) => {
+                  // Make these imports external and rewrite them to relative paths from dist/
+                  const relativePath = args.path.slice(2); // Remove "@/"
+                  // Return as external with the rewritten path
+                  // Note: detailed relative path calculation might be needed if imports are nested, 
+                  // but for a flat src structure or consistent dist mapping:
+                  return { path: `./${relativePath}.js`, external: true };
+                });
+              },
+            },
+          ],
         });
 
         if (!result.success) {
