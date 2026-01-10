@@ -37,7 +37,7 @@ async function main() {
   }
 
   // Start server
-  const port = parseInt(process.env.SERVER_PORT || '3000');
+  const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000');
   await server.start(port);
 
   console.log(`
