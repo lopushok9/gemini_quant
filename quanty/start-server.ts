@@ -21,19 +21,28 @@ async function main() {
 
   // Load characters from project
   const projectPath = path.resolve(__dirname, 'dist/index.js');
-  console.log(`Loading project from: ${projectPath}`);
+  console.log(`🔍 Loading project from: ${projectPath}`);
   
-  const project = await import(projectPath);
-  const projectModule = project.default || project;
-  
-  if (projectModule.agents && Array.isArray(projectModule.agents)) {
-    const characters = projectModule.agents.map((agent: any) => agent.character);
-    // Flatten plugin arrays from all agents
-    const allPlugins = projectModule.agents.flatMap((agent: any) => agent.plugins || []);
-    await server.startAgents(characters, allPlugins);
-    console.log(` Started ${characters.length} agent(s)`);
-  } else {
-    throw new Error('No agents found in project');
+  try {
+    const project = await import(projectPath);
+    const projectModule = project.default || project;
+    
+    console.log('📦 Project module keys:', Object.keys(projectModule));
+    
+    if (projectModule.agents && Array.isArray(projectModule.agents)) {
+      console.log(`🚀 Starting ${projectModule.agents.length} agent(s)...`);
+      
+      // Pass the agents array directly. Each agent object already has 'character' and 'plugins'
+      await server.startAgents(projectModule.agents);
+      
+      console.log(`✅ Started ${projectModule.agents.length} agent(s) successfully`);
+    } else {
+      console.error('❌ Error: No agents found in project. Make sure your src/index.ts exports an "agents" array.');
+      throw new Error('No agents found in project');
+    }
+  } catch (err) {
+    console.error('❌ Failed to load project bundle:', err);
+    throw err;
   }
 
   // Start server
