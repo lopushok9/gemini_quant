@@ -14,6 +14,7 @@ async function main() {
 
   // Initialize server with custom client path
   const postgresUrl = process.env.POSTGRES_URL;
+  const dataDir = process.env.PGLITE_DATA_DIR || path.resolve(__dirname, './data');
   
   try {
     console.log('🎬 Initializing AgentServer...');
