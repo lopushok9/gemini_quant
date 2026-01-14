@@ -32,7 +32,7 @@
     "start": "bun run start-server.ts",
     "build": "bun run build:backend && bun run build:frontend",
     "build:backend": "bun run build.ts",
-    "build:frontend": "vite build",
+    "build:frontend": "vite build --emptyOutDir false",
     "lint": "prettier --write ./src",
     "type-check": "tsc --noEmit",
     "test": "bun run test:install && bun run test:component && bun run test:e2e",

@@ -20,7 +20,7 @@ async function main() {
   });
 
   // Load characters from project
-  const projectPath = path.resolve(__dirname, 'dist/src/index.js');
+  const projectPath = path.resolve(__dirname, 'dist/index.js');
   console.log(`Loading project from: ${projectPath}`);
   
   const project = await import(projectPath);
