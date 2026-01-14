@@ -13,9 +13,11 @@ async function main() {
   const server = new AgentServer();
 
   // Initialize server with custom client path
+  const dataDir = process.env.PGLITE_DATA_DIR || path.resolve(__dirname, './data');
+  
   await server.initialize({
-    clientPath: path.resolve(__dirname, 'dist/frontend'), //  Point to OUR custom UI
-    dataDir: process.env.PGLITE_DATA_DIR || path.resolve(__dirname, '.eliza/.elizadb'),
+    clientPath: path.resolve(__dirname, 'dist/frontend'),
+    dataDir: dataDir,
     postgresUrl: process.env.POSTGRES_URL,
   });
 
