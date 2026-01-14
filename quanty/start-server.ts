@@ -13,18 +13,26 @@ async function main() {
   const server = new AgentServer();
 
   // Initialize server with custom client path
-  const dataDir = process.env.PGLITE_DATA_DIR || path.resolve(__dirname, './data');
+  const postgresUrl = process.env.POSTGRES_URL;
   
-  await server.initialize({
-    clientPath: path.resolve(__dirname, 'dist/frontend'),
-    dataDir: dataDir,
-    postgresUrl: process.env.POSTGRES_URL,
-  });
+  try {
+    console.log('🎬 Initializing AgentServer...');
+    await server.initialize({
+      clientPath: path.resolve(__dirname, 'dist/frontend'),
+      dataDir: dataDir,
+      postgresUrl: postgresUrl,
+    });
+    console.log('✅ AgentServer initialized');
+  } catch (initError: any) {
+    console.error('❌ CRITICAL: Failed to initialize AgentServer');
+    console.error('Error Message:', initError.message);
+    if (initError.cause) console.error('Cause:', initError.cause);
+    // This will print the specific PG error if available
+    if (initError.detail) console.error('PG Detail:', initError.detail);
+    if (initError.code) console.error('PG Code:', initError.code);
+    throw initError;
+  }
 
-  // Load characters from project
-  const projectPath = path.resolve(__dirname, 'dist/index.js');
-  console.log(`🔍 Loading project from: ${projectPath}`);
-  
   try {
     const project = await import(projectPath);
     const projectModule = project.default || project;
