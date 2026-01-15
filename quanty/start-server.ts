@@ -13,17 +13,16 @@ async function main() {
   const server = new AgentServer();
 
   // Initialize server with custom client path
-  const postgresUrl = process.env.POSTGRES_URL;
-  const dataDir = process.env.PGLITE_DATA_DIR || path.resolve(__dirname, './data');
+  const dataDir = path.resolve(__dirname, './data');
   
   try {
-    console.log('🎬 Initializing AgentServer...');
+    console.log('🎬 Initializing AgentServer (Local Mode)...');
     await server.initialize({
       clientPath: path.resolve(__dirname, 'dist/frontend'),
       dataDir: dataDir,
-      postgresUrl: postgresUrl,
+      // postgresUrl: process.env.POSTGRES_URL, // Temporarily disabled
     });
-    console.log('✅ AgentServer initialized');
+    console.log('✅ AgentServer initialized locally');
   } catch (initError: any) {
     console.error('❌ CRITICAL: Failed to initialize AgentServer');
     console.error('Error Message:', initError.message);
@@ -37,15 +36,15 @@ async function main() {
   try {
     const project = await import(projectPath);
     const projectModule = project.default || project;
-    
+
     console.log('📦 Project module keys:', Object.keys(projectModule));
-    
+
     if (projectModule.agents && Array.isArray(projectModule.agents)) {
       console.log(`🚀 Starting ${projectModule.agents.length} agent(s)...`);
-      
+
       // Pass the agents array directly. Each agent object already has 'character' and 'plugins'
       await server.startAgents(projectModule.agents);
-      
+
       console.log(`✅ Started ${projectModule.agents.length} agent(s) successfully`);
     } else {
       console.error('❌ Error: No agents found in project. Make sure your src/index.ts exports an "agents" array.');
