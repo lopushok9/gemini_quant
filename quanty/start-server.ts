@@ -11,43 +11,36 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const server = new AgentServer();
-
-  // Initialize server with custom client path
+  const postgresUrl = process.env.POSTGRES_URL;
   const dataDir = path.resolve(__dirname, './data');
+  const projectPath = path.resolve(__dirname, 'dist/index.js');
+
+  console.log('🎬 Starting AgentServer...');
+  console.log(`🔍 Project Path: ${projectPath}`);
   
   try {
-    console.log('🎬 Initializing AgentServer (Local Mode)...');
     await server.initialize({
       clientPath: path.resolve(__dirname, 'dist/frontend'),
       dataDir: dataDir,
-      // postgresUrl: process.env.POSTGRES_URL, // Temporarily disabled
+      // postgresUrl: postgresUrl, // Отключено для отладки
     });
     console.log('✅ AgentServer initialized locally');
   } catch (initError: any) {
     console.error('❌ CRITICAL: Failed to initialize AgentServer');
     console.error('Error Message:', initError.message);
-    if (initError.cause) console.error('Cause:', initError.cause);
-    // This will print the specific PG error if available
-    if (initError.detail) console.error('PG Detail:', initError.detail);
-    if (initError.code) console.error('PG Code:', initError.code);
     throw initError;
   }
 
   try {
     const project = await import(projectPath);
     const projectModule = project.default || project;
-
-    console.log('📦 Project module keys:', Object.keys(projectModule));
-
+    
     if (projectModule.agents && Array.isArray(projectModule.agents)) {
       console.log(`🚀 Starting ${projectModule.agents.length} agent(s)...`);
-
-      // Pass the agents array directly. Each agent object already has 'character' and 'plugins'
       await server.startAgents(projectModule.agents);
-
       console.log(`✅ Started ${projectModule.agents.length} agent(s) successfully`);
     } else {
-      console.error('❌ Error: No agents found in project. Make sure your src/index.ts exports an "agents" array.');
+      console.error('❌ Error: No agents found in project.');
       throw new Error('No agents found in project');
     }
   } catch (err) {
@@ -55,7 +48,6 @@ async function main() {
     throw err;
   }
 
-  // Start server
   const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000');
   await server.start(port);
 
