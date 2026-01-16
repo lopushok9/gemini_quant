@@ -37,3 +37,7 @@ yarn-error.log*
 *.db
 quanty/dist/
 quanty/tsconfig.build.tsbuildinfo
+
+# Local Data
+quanty/data/
+otaku-master/

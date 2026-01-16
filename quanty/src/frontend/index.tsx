@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import React from 'react';
-import type { UUID } from '@elizaos/core';
+import { App } from './App';
 
 const queryClient = new QueryClient();
 
@@ -20,46 +20,20 @@ declare global {
 }
 
 /**
- * Main Example route component
+ * Main application entry point
  */
-function ExampleRoute() {
-  const config = window.ELIZA_CONFIG;
-  const agentId = config?.agentId;
-
-  // Apply dark mode to the root element
-  React.useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, []);
-
-  if (!agentId) {
-    return (
-      <div className="p-4 text-center">
-        <div className="text-red-600 font-medium">Error: Agent ID not found</div>
-        <div className="text-sm text-gray-600 mt-2">
-          The server should inject the agent ID configuration.
-        </div>
-      </div>
-    );
-  }
-
-  return <ExampleProvider agentId={agentId as UUID} />;
-}
-
-/**
- * Example provider component
- */
-function ExampleProvider({ agentId }: { agentId: UUID }) {
+function Main() {
   return (
     <QueryClientProvider client={queryClient}>
-      <div>Hello {agentId}</div>
+      <App />
     </QueryClientProvider>
   );
 }
 
-// Initialize the application - no router needed for iframe
+// Initialize the application
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  createRoot(rootElement).render(<ExampleRoute />);
+  createRoot(rootElement).render(<Main />);
 }
 
 // Define types for integration with agent UI system
