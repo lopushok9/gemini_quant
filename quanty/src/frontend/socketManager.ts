@@ -10,7 +10,7 @@ const SOCKET_MESSAGE_TYPE = {
 } as const;
 
 // Generate a stable valid UUID for the session
-const sessionUserId = '00000000-0000-0000-0000-000000000001';
+export const sessionUserId = '00000000-0000-0000-0000-000000000001';
 
 class SocketManager {
     private socket: Socket | null = null;

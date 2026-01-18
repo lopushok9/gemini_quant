@@ -4,17 +4,21 @@ import {
     Bot,
     User,
     Loader2,
-    TrendingUp,
-    AlertCircle,
-    RefreshCw,
     Search,
-    LineChart,
     BarChart3,
-    ShieldAlert,
-    Code2
+    Code2,
+    MessageSquare,
+    History,
+    Settings,
+    MoreVertical,
+    LogOut,
+    Menu,
+    X,
+    Info
 } from 'lucide-react';
-import { socketManager } from './socketManager';
+import { socketManager, sessionUserId } from './socketManager';
 import { useQuery } from '@tanstack/react-query';
+import elizaLogo from './assets/elizaos-powered.png';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -29,11 +33,11 @@ export function App() {
     const [input, setInput] = useState('');
     const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const [agentId, setAgentId] = useState(window.ELIZA_CONFIG?.agentId || '');
-    const [debugInfo, setDebugInfo] = useState<string>('Initializing...');
 
-    // Fetch agentId if missing and setup socket
+    // Fetch agentId if missing
     useEffect(() => {
         if (!agentId) {
             const apiBase = window.ELIZA_CONFIG?.apiBase || '';
@@ -42,9 +46,7 @@ export function App() {
                 .then(data => {
                     const agents = data.data?.agents || data.agents || (Array.isArray(data) ? data : []);
                     if (agents.length > 0) {
-                        const id = agents[0].id;
-                        console.log('✅ Found agent:', id);
-                        setAgentId(id);
+                        setAgentId(agents[0].id);
                     }
                 })
                 .catch(err => console.error('Failed to fetch agents:', err));
@@ -55,12 +57,10 @@ export function App() {
     useEffect(() => {
         if (!agentId) return;
 
-        console.log('🔌 Connecting to socket for agent:', agentId);
         const socket = socketManager.connect();
 
         const setupSocket = () => {
             socketManager.joinRoom(agentId);
-            setDebugInfo(`Analyst Link: Active`);
         };
 
         if (socket.connected) {
@@ -70,19 +70,21 @@ export function App() {
         }
 
         const unsubscribe = socketManager.onMessage((data) => {
-            console.log('📩 Socket message received:', data);
-
-            // Check if it's a "thinking" event or actual message
-            if (data.type === 5) { // THINKING
-                // We show thinking state during the sending process anyway
+            // CRITICAL FIX: Ignore messages sent by ME (the user)
+            // This prevents the "echo" effect where the server broadcasts my own message back.
+            if (data.senderId === sessionUserId || data.userId === sessionUserId) {
                 return;
             }
+
+            // Ignore system thinking events if we handle them locally (optional, but good for cleanup)
+            if (data.type === 5) return;
 
             const botText = data.content || data.text || '';
             if (!botText) return;
 
             setMessages(prev => {
-                // Find if there's an existing thinking message to replace
+                // Remove the "Thinking" placeholder if it exists and looks like it belongs to this response
+                // For simplicity, we remove the *last* message if it is thinking
                 const lastMsg = prev[prev.length - 1];
                 if (lastMsg?.role === 'assistant' && lastMsg.isThinking) {
                     return [...prev.slice(0, -1), {
@@ -93,7 +95,7 @@ export function App() {
                         isThinking: false
                     }];
                 }
-                // Otherwise just add it
+                // Otherwise append new message
                 return [...prev, {
                     role: 'assistant',
                     content: botText,
@@ -111,12 +113,12 @@ export function App() {
         };
     }, [agentId]);
 
-    // Apply dark mode initially
+    // Apply dark mode
     useEffect(() => {
         document.documentElement.classList.add('dark');
     }, []);
 
-    // Auto-scroll to bottom
+    // Scroll handling
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
@@ -125,6 +127,7 @@ export function App() {
         e.preventDefault();
         if (!input.trim() || isSending || !agentId) return;
 
+        // 1. Optimistically Add User Message
         const userMessage: Message = {
             role: 'user',
             content: input,
@@ -136,7 +139,7 @@ export function App() {
         setInput('');
         setIsSending(true);
 
-        // Add thinking message to UI
+        // 2. Add "Thinking" Placeholder immediately
         const botId = (Date.now() + 1).toString();
         setMessages(prev => [...prev, {
             role: 'assistant',
@@ -147,23 +150,21 @@ export function App() {
         }]);
 
         try {
-            console.log('📤 Sending via socket:', input);
             socketManager.sendMessage(agentId, input);
 
-            // Set a timeout in case socket fails to respond
+            // Timeout safety
             setTimeout(() => {
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last?.id === botId && last.isThinking && isSending) {
                         setIsSending(false);
-                        return prev.map(m => m.id === botId ? { ...m, content: 'Analysis timed out. Please retry.', isThinking: false } : m);
+                        return prev.map(m => m.id === botId ? { ...m, content: 'Response timed out.', isThinking: false } : m);
                     }
                     return prev;
                 });
             }, 30000);
 
         } catch (error: any) {
-            console.error('Socket Send Error:', error);
             setMessages(prev => prev.map(m =>
                 m.id === botId
                     ? { ...m, content: `Error: ${error.message}`, isThinking: false }
@@ -174,104 +175,161 @@ export function App() {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-background text-foreground font-mono selection:bg-primary/30">
-            {/* Header */}
-            <header className="border-b border-border bg-background/50 backdrop-blur p-4 flex items-center justify-between sticky top-0 z-10 h-16">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center text-primary border border-primary/30">
+        <div className="flex h-screen bg-[#111] text-foreground font-mono overflow-hidden selection:bg-primary/20">
+            {/* Mobile Sidebar Overlay */}
+            {sidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/60 z-20 md:hidden backdrop-blur-sm"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
+            {/* Sidebar (Otaku Style) */}
+            <aside
+                className={`
+                    fixed md:relative z-30 w-[280px] h-full flex flex-col
+                    bg-[#18181b] border-r border-[#333] transition-transform duration-300
+                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                `}
+            >
+                {/* Brand Header */}
+                <div className="h-16 flex items-center px-6 border-b border-[#333]">
+                    <div className="w-8 h-8 rounded bg-blue-600/20 text-blue-500 flex items-center justify-center mr-3 border border-blue-600/30">
                         <Bot size={20} />
                     </div>
-                    <div>
-                        <h1 className="text-sm font-bold tracking-wider uppercase text-foreground/90 flex items-center gap-2">
-                            Quanty
-                            <span className="text-[10px] text-primary/80 font-normal px-1.5 py-0.5 bg-primary/10 rounded border border-primary/20">BETA</span>
-                        </h1>
+                    <div className="flex flex-col">
+                        <span className="font-bold tracking-widest text-lg text-white font-sans uppercase">QUANTY</span>
+                        <span className="text-[10px] text-muted-foreground tracking-widest uppercase">Market Analysis Agent</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border/50 text-muted-foreground">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                        <span className="tracking-widest text-[10px] font-bold">LIVE</span>
+
+                {/* Navigation */}
+                <div className="flex-1 overflow-y-auto py-6 px-4 space-y-6">
+                    {/* Chat History Section */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between px-2 text-xs font-bold text-blue-500 uppercase tracking-widest mb-3">
+                            <span className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                Chat History
+                            </span>
+                            <Info size={12} className="opacity-50 hover:opacity-100 cursor-pointer" />
+                        </div>
+
+                        <div className="space-y-1">
+                            <div className="px-3 py-2 bg-[#27272a] border border-[#333] rounded text-xs text-white/90 cursor-pointer hover:border-blue-500/50 transition-colors">
+                                <span className="opacity-50 mr-2 text-[10px]">TODAY</span>
+                                Initial Greeting
+                            </div>
+                            {/* Dummy history items */}
+                            {[1].map(i => (
+                                <div key={i} className="px-3 py-2 rounded text-xs text-neutral-500 hover:text-white hover:bg-[#27272a] cursor-pointer transition-colors truncate">
+                                    Previous Analysis #{i}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="px-2 text-xs font-bold text-neutral-600 uppercase tracking-widest mb-3">
+                            Functions
+                        </div>
+                        <button onClick={() => setInput("Market Scan")} className="w-full text-left px-3 py-2 rounded text-xs text-neutral-400 hover:text-white hover:bg-[#27272a] flex items-center gap-3 transition-colors">
+                            <Search size={14} />
+                            Market Scan
+                        </button>
+                        <button onClick={() => setInput("Portfolio Analysis")} className="w-full text-left px-3 py-2 rounded text-xs text-neutral-400 hover:text-white hover:bg-[#27272a] flex items-center gap-3 transition-colors">
+                            <BarChart3 size={14} />
+                            Portfolio Stats
+                        </button>
                     </div>
                 </div>
-            </header>
+
+                {/* User Footer */}
+                <div className="p-4 border-t border-[#333] bg-[#141417] flex flex-col gap-4">
+                    <div className="flex items-center gap-3 px-2 py-1">
+                        <div className="w-8 h-8 rounded bg-gradient-to-tr from-orange-500 to-yellow-500 flex items-center justify-center text-black font-bold text-xs ring-2 ring-[#333]">
+                            U
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-bold text-white truncate">OPERATOR</div>
+                            <div className="text-[10px] text-neutral-500 truncate">connected</div>
+                        </div>
+                    </div>
+
+                    {/* Powered By Logo */}
+                    <div className="px-2 pb-2">
+                        <img src={elizaLogo} alt="Powered by ElizaOS" className="h-6 w-auto opacity-50 hover:opacity-100 transition-opacity" />
+                    </div>
+                </div>
+            </aside>
 
             {/* Main Chat Area */}
-            <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 scrollbar-thin">
-                {messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center space-y-10 animate-in fade-in zoom-in-95 duration-700">
-                        <div className="space-y-6">
-                            <div className="inline-flex p-8 rounded-full bg-linear-to-b from-primary/20 to-transparent border border-primary/20 shadow-[0_0_30px_-5px_var(--color-primary)]">
-                                <LineChart size={64} className="text-primary drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]" />
-                            </div>
-                            <div className="space-y-2">
-                                <h2 className="text-3xl font-bold tracking-tight text-foreground">Quanty Protocol</h2>
-                                <p className="text-muted-foreground text-sm max-w-md mx-auto leading-relaxed">
-                                    Institutional-grade analytics terminal.<br />
-                                    Connected to internal liquidity monitors.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
-                            <QuickAction
-                                icon={<Search size={18} />}
-                                title="Market Scan"
-                                desc="Deep diagnostics on ticker"
-                                onClick={() => setInput("Analyze BTC")}
-                            />
-                            <QuickAction
-                                icon={<BarChart3 size={18} />}
-                                title="Institutional Flow"
-                                desc="Check equity volume"
-                                onClick={() => setInput("Analyze NVDA")}
-                            />
+            <main className="flex-1 flex flex-col min-w-0 bg-[#09090b]">
+                {/* Main Header */}
+                <header className="h-16 border-b border-[#222] flex items-center justify-between px-6 bg-[#09090b]">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden text-neutral-400 hover:text-white">
+                            <Menu size={24} />
+                        </button>
+                        <h1 className="text-2xl font-black tracking-tighter text-white uppercase font-sans">CHAT</h1>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-[#18181b] border border-[#333] text-neutral-400">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-[10px] font-bold tracking-widest uppercase">System Online</span>
                         </div>
                     </div>
-                ) : (
-                    <div className="max-w-3xl mx-auto space-y-8">
-                        {messages.map((m) => (
-                            <MessageBubble key={m.id} message={m} />
-                        ))}
-                        <div ref={messagesEndRef} className="h-4" />
-                    </div>
-                )}
-            </main>
+                </header>
 
-            {/* Input Footer */}
-            <footer className="p-4 sm:p-6 bg-background/80 backdrop-blur border-t border-border/40">
-                <div className="max-w-3xl mx-auto">
-                    <form onSubmit={sendMessage} className="relative flex items-end gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50 focus-within:border-primary/50 focus-within:bg-muted/50 focus-within:shadow-[0_0_20px_-10px_var(--color-primary)] transition-all duration-300">
-                        <div className="absolute left-4 top-4 text-muted-foreground/40">
-                            <Code2 size={16} />
+                {/* Messages List */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                    {messages.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center opacity-40">
+                            <Bot size={48} className="text-neutral-600 mb-4" />
+                            <p className="text-sm text-neutral-500 font-mono">QUANTY SYSTEM READY</p>
                         </div>
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Enter command or analysis request..."
-                            className="w-full bg-transparent border-none pl-10 pr-4 py-3 outline-none text-sm placeholder:text-muted-foreground/50 min-h-[48px] font-mono text-foreground"
-                            disabled={isSending}
-                            autoComplete="off"
-                        />
-                        <div className="flex items-center gap-2 pb-1 pr-1">
-                            {isSending ? (
-                                <div className="p-2.5 text-primary/80">
-                                    <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                        <div className="max-w-4xl mx-auto space-y-6 w-full">
+                            {messages.map((m) => (
+                                <MessageBubble key={m.id} message={m} />
+                            ))}
+                            <div ref={messagesEndRef} className="h-4" />
+                        </div>
+                    )}
+                </div>
+
+                {/* Input Area */}
+                <div className="p-4 sm:p-6 bg-[#09090b] border-t border-[#222]">
+                    <div className="max-w-4xl mx-auto">
+                        <form onSubmit={sendMessage} className="relative group">
+                            <div className="relative flex items-center gap-3 bg-[#18181b] p-2 rounded-lg border border-[#333] group-focus-within:border-neutral-500 transition-colors">
+                                <div className="pl-3 text-neutral-500">
+                                    <Code2 size={18} />
                                 </div>
-                            ) : (
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    placeholder="Type your command..."
+                                    className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder-neutral-600 h-10 font-mono"
+                                    disabled={isSending}
+                                    autoComplete="off"
+                                />
                                 <button
                                     type="submit"
                                     disabled={!input.trim() || isSending}
-                                    className="p-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 disabled:opacity-0 disabled:scale-90 transition-all duration-200"
+                                    className="p-2 rounded bg-[#27272a] text-white hover:bg-blue-600 hover:text-white disabled:opacity-50 disabled:hover:bg-[#27272a] transition-all"
                                 >
-                                    <Send size={16} />
+                                    {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                                 </button>
-                            )}
-                        </div>
-                    </form>
+                            </div>
+                            <div className="mt-2 flex justify-end text-[10px] text-neutral-600 uppercase tracking-widest">
+                                Powered by ElizaOS
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </footer>
+            </main>
         </div>
     );
 }
@@ -280,63 +338,42 @@ function MessageBubble({ message }: { message: Message }) {
     const isBot = message.role === 'assistant';
 
     return (
-        <div className={`flex gap-5 ${isBot ? '' : 'flex-row-reverse'} group animate-in fade-in slide-in-from-bottom-3 duration-500`}>
-            {/* Avatar */}
-            <div className={`w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-xs shadow-sm
-                ${isBot
-                    ? 'bg-primary/10 text-primary border border-primary/20'
-                    : 'bg-muted text-muted-foreground border border-border'
-                }`}>
-                {isBot ? <Bot size={18} /> : <User size={18} />}
-            </div>
+        <div className={`flex w-full ${isBot ? 'justify-start' : 'justify-end'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+            <div className={`max-w-[85%] md:max-w-[70%] flex gap-4 ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
 
-            {/* Content */}
-            <div className={`flex flex-col max-w-[85%] sm:max-w-[75%] space-y-1.5 ${isBot ? 'items-start' : 'items-end'}`}>
-                <div className="flex items-center gap-2 px-1">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        {isBot ? 'Quanty System' : 'Operator'}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/40 font-mono">
-                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                </div>
-                <div className={`
-                    relative px-6 py-4 text-sm leading-7 shadow-sm font-light tracking-wide
-                    ${isBot
-                        ? 'bg-card/80 border border-border/60 rounded-2xl rounded-tl-sm text-foreground/90 backdrop-blur-sm'
-                        : 'bg-primary/90 text-primary-foreground rounded-2xl rounded-tr-sm border border-primary/50'
-                    }
-                `}>
-                    {message.isThinking ? (
-                        <div className="flex items-center gap-3 opacity-70">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                            </span>
-                            <span className="text-xs font-mono uppercase tracking-widest">Processing</span>
-                        </div>
-                    ) : (
-                        <div className="whitespace-pre-wrap">{message.content}</div>
-                    )}
+                {/* Content Bubble */}
+                <div className="flex flex-col gap-1 min-w-0">
+                    {/* Message Meta */}
+                    <div className={`flex items-center gap-2 ${isBot ? '' : 'flex-row-reverse'} opacity-50 mb-1`}>
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isBot ? 'text-blue-400' : 'text-neutral-400'}`}>
+                            {isBot ? 'Quanty' : 'You'}
+                        </span>
+                        <span className="text-[10px] font-mono text-neutral-500">
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                    </div>
+
+                    {/* Bubble Card */}
+                    <div className={`
+                        relative p-4 text-sm leading-relaxed font-mono shadow-md
+                        ${isBot
+                            ? 'bg-[#1a1c1e] text-neutral-200 border border-[#333] rounded-r-lg rounded-bl-lg'
+                            : 'bg-blue-600 text-white border border-blue-500 rounded-l-lg rounded-br-lg'
+                        }
+                    `}>
+                        {message.isThinking ? (
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce"></span>
+                                <span className="text-[10px] uppercase tracking-widest ml-2 opacity-70">Computing</span>
+                            </div>
+                        ) : (
+                            <div className="whitespace-pre-wrap">{message.content}</div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
-    );
-}
-
-function QuickAction({ icon, title, desc, onClick }: { icon: React.ReactNode, title: string, desc: string, onClick: () => void }) {
-    return (
-        <button
-            onClick={onClick}
-            className="flex items-center gap-4 p-5 bg-card/40 hover:bg-card/80 border border-border/50 hover:border-primary/40 rounded-xl transition-all group text-left backdrop-blur-sm hover:shadow-lg hover:shadow-primary/5"
-        >
-            <div className="p-3 rounded-lg bg-background/50 group-hover:bg-primary/20 group-hover:text-primary transition-colors border border-border/50 group-hover:border-primary/30">
-                {icon}
-            </div>
-            <div>
-                <div className="text-sm font-bold text-foreground/90 group-hover:text-primary transition-colors uppercase tracking-wide">{title}</div>
-                <div className="text-xs text-muted-foreground mt-0.5 font-light">{desc}</div>
-            </div>
-        </button>
     );
 }
