@@ -6,6 +6,7 @@
 import { AgentServer } from '@elizaos/server';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,25 +19,28 @@ async function main() {
   console.log('🎬 Starting AgentServer...');
   console.log(`🔍 Project Path: ${projectPath}`);
 
-  // DEBUG: List files to find where frontend went
-  try {
-      const { execSync } = await import('child_process');
-      console.log('📂 File System Debug: ls -R dist');
-      console.log(execSync('ls -R dist').toString());
-  } catch (e) {
-      console.log('Could not list dist directory');
+  // Determine Client Path (Handle potential nesting from Vite)
+  let clientPath = path.resolve(__dirname, 'dist/frontend');
+  
+  // If Vite nested it (common issue), check the nested path
+  const nestedPath = path.resolve(__dirname, 'dist/frontend/src/frontend');
+  if (!fs.existsSync(path.join(clientPath, 'index.html')) && fs.existsSync(path.join(nestedPath, 'index.html'))) {
+      console.log('📂 Detected nested frontend structure, adjusting clientPath...');
+      clientPath = nestedPath;
   }
 
-  const clientPath = path.resolve(__dirname, 'dist/frontend');
-  console.log(`🔍 Client Path: ${clientPath}`);
+  console.log(`🔍 Final Client Path: ${clientPath}`);
   
   // Verify frontend files exist
-  const fs = await import('fs');
   if (fs.existsSync(path.join(clientPath, 'index.html'))) {
       console.log('✅ Custom frontend found (index.html exists)');
   } else {
       console.warn('⚠️ WARNING: Custom frontend NOT found at expected path!');
-      console.warn('   Server will likely fallback to default ElizaOS UI or 404.');
+      console.warn('   Checking dist contents:');
+      try {
+          const { execSync } = await import('child_process');
+          console.log(execSync('ls -R dist').toString());
+      } catch (e) {}
   }
 
   try {
@@ -54,14 +58,30 @@ async function main() {
     throw initError;
   }
 
+  // Force root route to serve our index.html (Bypass library defaults)
+  server.app.get('/', (req, res) => {
+      const indexHtml = path.join(clientPath, 'index.html');
+      if (fs.existsSync(indexHtml)) {
+          res.sendFile(indexHtml);
+      } else {
+          res.status(404).send('Custom UI index.html not found at ' + clientPath);
+      }
+  });
+
   try {
     const project = await import(projectPath);
     const projectModule = project.default || project;
 
     if (projectModule.agents && Array.isArray(projectModule.agents)) {
       console.log(`🚀 Starting ${projectModule.agents.length} agent(s)...`);
-      await server.startAgents(projectModule.agents);
-      console.log(`✅ Started ${projectModule.agents.length} agent(s) successfully`);
+      
+      // OTAKU-STYLE UNWRAP: Pass characters and plugins separately
+      // This is often required by newer @elizaos/server versions
+      const characters = projectModule.agents.map((a: any) => a.character);
+      const allPlugins = projectModule.agents.flatMap((a: any) => a.plugins || []);
+      
+      await server.startAgents(characters, allPlugins);
+      console.log(`✅ Started ${characters.length} agent(s) successfully`);
     } else {
       console.error('❌ Error: No agents found in project.');
       throw new Error('No agents found in project');
@@ -71,22 +91,12 @@ async function main() {
     throw err;
   }
 
-  // FORCE override the root route to serve our index.html
-  // This ensures that even if ElizaOS has a default handler, we try to serve our file first.
-  server.app.get('/', (req, res) => {
-      const indexHtml = path.join(clientPath, 'index.html');
-      if (fs.existsSync(indexHtml)) {
-          res.sendFile(indexHtml);
-      } else {
-          res.status(404).send('Custom UI not found');
-      }
-  });
-
-  const port = parseInt(process.env.SERVER_PORT || process.env.PORT || '3000');
+  // Use the port provided by Railway ($PORT)
+  const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000');
   await server.start(port);
 
   console.log(`
- Server with custom UI running on http://localhost:${port}
+ Server with custom UI running on port ${port}
 `);
 }
 

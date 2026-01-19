@@ -30,7 +30,7 @@
     "dev": "bun run build:backend --watch & vite",
     "prestart": "bun run build",
     "start": "bun run start-server.ts",
-    "build": "bun run build:backend && bun run build:frontend",
+    "build": "rm -rf dist && bun run build:backend && bun run build:frontend",
     "build:backend": "bun run ./build.ts",
     "build:frontend": "vite build --config vite.config.ts --emptyOutDir false",
     "lint": "prettier --write ./src",
