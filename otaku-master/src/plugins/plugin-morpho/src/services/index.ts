@@ -1,1 +1,0 @@
-export { MorphoService } from "./morphoService";
