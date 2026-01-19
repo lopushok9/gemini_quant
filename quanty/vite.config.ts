@@ -8,9 +8,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Remove root: 'src/frontend' to run from project root
+  root: 'src/frontend', // Set root to frontend source
+  base: './', // Use relative paths for assets (like otaku-master)
   build: {
-    outDir: 'dist/frontend', // Simple relative path from root
+    outDir: '../../dist/frontend', // Output relative to root (src/frontend -> ../../dist/frontend)
     emptyOutDir: true,
     rollupOptions: {
       input: {
