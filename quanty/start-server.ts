@@ -62,6 +62,17 @@ async function main() {
     throw err;
   }
 
+  // FORCE override the root route to serve our index.html
+  // This ensures that even if ElizaOS has a default handler, we try to serve our file first.
+  server.app.get('/', (req, res) => {
+      const indexHtml = path.join(clientPath, 'index.html');
+      if (fs.existsSync(indexHtml)) {
+          res.sendFile(indexHtml);
+      } else {
+          res.status(404).send('Custom UI not found');
+      }
+  });
+
   const port = parseInt(process.env.SERVER_PORT || process.env.PORT || '3000');
   await server.start(port);
 
