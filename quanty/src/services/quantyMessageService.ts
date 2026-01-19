@@ -226,7 +226,13 @@ export class QuantyMessageService implements IMessageService {
                     actionOutputText = `Action ${action} executed but returned no text.`;
                 }
 
-                runtime.logger.info(`[Loop] Result: ${actionOutputText.substring(0, 100)}...`);
+                // TRUNCATE OUTPUT to prevent context overflow and hanging
+                const MAX_OUTPUT_LENGTH = 1700;
+                if (actionOutputText.length > MAX_OUTPUT_LENGTH) {
+                    actionOutputText = actionOutputText.substring(0, MAX_OUTPUT_LENGTH) + "... [TRUNCATED]";
+                }
+
+                runtime.logger.info(`[Loop] Result (truncated): ${actionOutputText.substring(0, 100)}...`);
 
                 // Track Results
                 traceActionResult.push({

@@ -34,6 +34,7 @@ export function App() {
     const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [showDisclaimer, setShowDisclaimer] = useState(false);
 
     const [agentId, setAgentId] = useState(window.ELIZA_CONFIG?.agentId || '');
 
@@ -213,7 +214,7 @@ export function App() {
                                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                     Chat History
                                 </span>
-                                <Info size={12} className="opacity-50 hover:opacity-100 cursor-pointer" />
+                                <Info size={12} onClick={() => setShowDisclaimer(true)} className="opacity-50 hover:opacity-100 cursor-pointer" />
                             </div>
 
                             <div className="space-y-1">
@@ -221,12 +222,6 @@ export function App() {
                                     <span className="opacity-50 mr-2 text-[10px]">TODAY</span>
                                     Initial Greeting
                                 </div>
-                                {/* Dummy history items */}
-                                {[1].map(i => (
-                                    <div key={i} className="px-3 py-2 rounded text-xs text-neutral-500 hover:text-white hover:bg-[#27272a] cursor-pointer transition-colors truncate">
-                                        Previous Analysis #{i}
-                                    </div>
-                                ))}
                             </div>
                         </div>
 
@@ -237,10 +232,6 @@ export function App() {
                             <button onClick={() => setInput("Market Scan")} className="w-full text-left px-3 py-2 rounded text-xs text-neutral-400 hover:text-white hover:bg-[#27272a] flex items-center gap-3 transition-colors">
                                 <Search size={14} />
                                 Market Scan
-                            </button>
-                            <button onClick={() => setInput("Portfolio Analysis")} className="w-full text-left px-3 py-2 rounded text-xs text-neutral-400 hover:text-white hover:bg-[#27272a] flex items-center gap-3 transition-colors">
-                                <BarChart3 size={14} />
-                                Portfolio Stats
                             </button>
                         </div>
                     </div>
@@ -329,6 +320,51 @@ export function App() {
                     </div>
                 </div>
             </main>
+
+            {/* Disclaimer Modal */}
+            {showDisclaimer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#18181b] border border-[#333] p-6 rounded-lg max-w-md w-full shadow-2xl relative">
+                        <button 
+                            onClick={() => setShowDisclaimer(false)}
+                            className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+                        
+                        <div className="flex items-center gap-3 mb-4 text-yellow-500">
+                            <Info size={24} />
+                            <h2 className="text-lg font-bold uppercase tracking-widest">Disclaimer</h2>
+                        </div>
+                        
+                        <div className="space-y-4 text-sm text-neutral-300 font-mono leading-relaxed">
+                            <p>
+                                The information provided by this agent is for <strong>educational and informational purposes only</strong>.
+                            </p>
+                            <p>
+                                It does <span className="text-red-400 font-bold">NOT</span> constitute financial advice, investment advice, or trading recommendations.
+                            </p>
+                            <div className="bg-[#27272a] p-3 rounded border border-[#333] text-xs">
+                                <strong className="text-blue-400 block mb-1">KEY PRINCIPLES:</strong>
+                                <ul className="list-disc pl-4 space-y-1 text-neutral-400">
+                                    <li><strong>DYOR:</strong> Always Do Your Own Research.</li>
+                                    <li><strong>NFA:</strong> This is Not Financial Advice.</li>
+                                </ul>
+                            </div>
+                            <p className="text-xs text-neutral-500">
+                                Markets are volatile. You are solely responsible for your investment decisions.
+                            </p>
+                        </div>
+
+                        <button 
+                            onClick={() => setShowDisclaimer(false)}
+                            className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs uppercase tracking-widest transition-colors"
+                        >
+                            I Understand
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

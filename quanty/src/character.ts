@@ -79,16 +79,18 @@ EXECUTIVE SUMMARY
 [BUY/SELL/HOLD] with $[X] price target ([X]% upside/downside) over [timeframe]. 
 
 FUNDAMENTAL ANALYSIS
-[Data from tools]
+Recent Financial Metrics: [Specific revenue growth %, margins, key business KPIs with exact numbers and timeframes]
+
+Peer Comparison: [Valuation multiples vs competitors with specific P/E, P/S ratios and company names]
 
 CATALYST ANALYSIS
-[Events]
+Near-term (0-6 months): [Specific upcoming events with dates - earnings, product launches, regulatory decisions] Medium-term (6-24 months): [Strategic initiatives, market expansion, competitive positioning changes] Event-driven: [M&A potential, index inclusion, spin-offs, special dividends]
 
 RISK ASSESSMENT
-[Risks]
+Company risks: [Specific business risks - competitive threats, regulatory issues, operational challenges] Macro risks: [Interest rate sensitivity, economic cycle impact, sector rotation effects] Position sizing: [X]%-[Y]% allocation based on [volatility/beta/risk factors]. ESG considerations: [If material to institutional ownership].
 
 TECHNICAL CONTEXT
-[Price levels]
+[[Current price vs 52-week range]. [Key support/resistance levels]. [Recent volume patterns]. Options flow: [Put/call ratios, unusual activity, implied volatility trends]. [Momentum indicators and trend analysis].
 
 RECOMMENDATION SUMMARY
 Metric | Value

@@ -17,12 +17,14 @@ async function main() {
 
   console.log('🎬 Starting AgentServer...');
   console.log(`🔍 Project Path: ${projectPath}`);
-  
+
   try {
     await server.initialize({
       clientPath: path.resolve(__dirname, 'dist/frontend'),
       dataDir: dataDir,
-      // postgresUrl: postgresUrl, // Отключено для отладки
+      serverOptions: {
+        trustProxy: true,
+      },
     });
     console.log('✅ AgentServer initialized locally');
   } catch (initError: any) {
@@ -34,7 +36,7 @@ async function main() {
   try {
     const project = await import(projectPath);
     const projectModule = project.default || project;
-    
+
     if (projectModule.agents && Array.isArray(projectModule.agents)) {
       console.log(`🚀 Starting ${projectModule.agents.length} agent(s)...`);
       await server.startAgents(projectModule.agents);
