@@ -18,6 +18,15 @@ async function main() {
   console.log('🎬 Starting AgentServer...');
   console.log(`🔍 Project Path: ${projectPath}`);
 
+  // DEBUG: List files to find where frontend went
+  try {
+      const { execSync } = await import('child_process');
+      console.log('📂 File System Debug: ls -R dist');
+      console.log(execSync('ls -R dist').toString());
+  } catch (e) {
+      console.log('Could not list dist directory');
+  }
+
   const clientPath = path.resolve(__dirname, 'dist/frontend');
   console.log(`🔍 Client Path: ${clientPath}`);
   
