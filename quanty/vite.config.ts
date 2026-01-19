@@ -8,9 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  root: 'src/frontend',
+  // Remove root: 'src/frontend' to run from project root
   build: {
-    outDir: '../../dist/frontend',
+    outDir: 'dist/frontend', // Simple relative path from root
     emptyOutDir: true,
     rollupOptions: {
       input: {
