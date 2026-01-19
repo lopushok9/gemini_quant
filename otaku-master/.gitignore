@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+bun.lockb
+bun.lock
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+.eliza/
+.elizadb/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Turbo
+.turbo/
+
+# Testing
+coverage/
+
+# Temporary files
+*.tmp
+temp/
+
+# Workspace packages
+packages/*/dist/
+packages/*/node_modules/
+packages/*/.turbo/
+packages/*/tsconfig.tsbuildinfo
+
+.claude/cache/
+/thoughts
+/strix_runs
+/scripts

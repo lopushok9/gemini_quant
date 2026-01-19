@@ -1,0 +1,110 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    # Optional: Only run on specific file changes
+    # paths:
+    #   - "src/**/*.ts"
+    #   - "src/**/*.tsx"
+    #   - "src/**/*.js"
+    #   - "src/**/*.jsx"
+
+jobs:
+  claude-review:
+    # Optional: Filter by PR author
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are reviewing PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+
+            ## Step 1: Gather Context
+            First, run these commands to understand the changes:
+            ```bash
+            gh pr view ${{ github.event.pull_request.number }} --json title,body,files
+            gh pr diff ${{ github.event.pull_request.number }}
+            ```
+
+            ## Step 2: Review Focus Areas
+
+            ### 🔒 CRITICAL: DeFi & Wallet Security
+            This is a DeFi AI agent handling real cryptocurrency transactions. Scrutinize:
+            - **Transaction safety**: Are amounts validated? Are there safeguards against draining wallets?
+            - **Network handling**: Correct chain IDs? Proper gas token logic (ETH vs WETH vs POL)?
+            - **Private key/secret exposure**: No secrets in logs, error messages, or state?
+            - **Input sanitization**: Are wallet addresses, token addresses, and amounts validated?
+            - **Slippage & MEV**: Are swap/bridge operations protected?
+
+            ### 🏗️ Architecture & ElizaOS Patterns
+            - **Plugin structure**: Actions in `src/plugins/plugin-*/src/actions/`, exported from `index.ts`?
+            - **Action validation**: Does `validate()` properly gate the action? Multi-stage validation present?
+            - **State management**: Parameters flow through `state.data.actionParams` correctly?
+            - **DRY violations**: Duplicated logic that should be in shared `utils/actionHelpers.ts`?
+
+            ### 🧪 Test Coverage
+            - New plugin actions MUST have tests (tests live in `src/packages/*/`)
+            - Bug fixes should include regression tests
+            - Flag missing tests as **required changes**, not suggestions
+
+            ### 📝 Type Safety
+            - Flag `any` types - this codebase should use strict typing
+            - Ensure proper TypeScript interfaces for action parameters and responses
+            - Validate Zod schemas match actual runtime data
+
+            ### 🎯 Code Quality
+            - Unhandled promise rejections or missing error boundaries
+            - Race conditions in async wallet operations
+            - Memory leaks in event listeners or subscriptions
+
+            ## Step 3: Submit Review
+            Format your review as a structured comment using `gh pr comment`:
+
+            ```bash
+            gh pr comment ${{ github.event.pull_request.number }} --body "## 🤖 Claude Code Review
+
+            ### Summary
+            [1-2 sentence summary of what this PR does]
+
+            ### 🔒 Security
+            [Security findings or ✅ No security concerns]
+
+            ### 🐛 Issues Found
+            [Numbered list of issues with file:line references, or ✅ No issues]
+
+            ### 💡 Suggestions
+            [Optional improvements, not blocking]
+
+            ### 📋 Checklist
+            - [ ] Tests added/updated
+            - [ ] Types are strict (no \`any\`)
+            - [ ] Follows plugin patterns from CLAUDE.md
+            "
+            ```
+
+            Be concise, specific, and reference exact file paths and line numbers.
+
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+
