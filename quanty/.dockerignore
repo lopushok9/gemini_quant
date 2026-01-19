@@ -171,9 +171,9 @@ test/
 *.spec.ts
 
 # Build tools configuration
-vite.config.ts
-tailwind.config.js
-postcss.config.js
+# vite.config.ts
+# tailwind.config.js
+# postcss.config.js
 .nixpacks.toml
 nixpacks.toml
 
