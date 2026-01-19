@@ -18,9 +18,21 @@ async function main() {
   console.log('🎬 Starting AgentServer...');
   console.log(`🔍 Project Path: ${projectPath}`);
 
+  const clientPath = path.resolve(__dirname, 'dist/frontend');
+  console.log(`🔍 Client Path: ${clientPath}`);
+  
+  // Verify frontend files exist
+  const fs = await import('fs');
+  if (fs.existsSync(path.join(clientPath, 'index.html'))) {
+      console.log('✅ Custom frontend found (index.html exists)');
+  } else {
+      console.warn('⚠️ WARNING: Custom frontend NOT found at expected path!');
+      console.warn('   Server will likely fallback to default ElizaOS UI or 404.');
+  }
+
   try {
     await server.initialize({
-      clientPath: path.resolve(__dirname, 'dist/frontend'),
+      clientPath: clientPath,
       dataDir: dataDir,
       serverOptions: {
         trustProxy: true,
