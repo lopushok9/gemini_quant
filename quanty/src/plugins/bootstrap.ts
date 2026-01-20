@@ -20,14 +20,19 @@ class MessageServiceInstaller extends Service {
         const myMessageService = new QuantyMessageService();
         runtime.messageService = myMessageService;
 
-        // Вспомогательная функция для отправки ответа обратно в шину (как в Otaku)
+        // Вспомогательная функция для отправки ответа обратно в шину
         const sendResponseToBus = async (roomId: string, text: string, originalMsg: any) => {
             const port = process.env.PORT || process.env.SERVER_PORT || '3000';
-            // Пробуем разные варианты локального хоста для максимальной совместимости с Docker/Railway
-            const hosts = ['127.0.0.1', 'localhost', '0.0.0.0'];
+            const centralUrl = process.env.CENTRAL_MESSAGE_SERVER_URL;
             
-            for (const host of hosts) {
-                const url = `http://${host}:${port}/api/messaging/submit`;
+            // Формируем список URL для попыток отправки
+            const urls = [];
+            if (centralUrl) urls.push(`${centralUrl}/api/messaging/submit`);
+            urls.push(`http://127.0.0.1:${port}/api/messaging/submit`);
+            urls.push(`http://127.0.0.1:3000/api/messaging/submit`);
+            urls.push(`http://localhost:${port}/api/messaging/submit`);
+
+            for (const url of urls) {
                 try {
                     const payload = {
                         channel_id: originalMsg.channel_id || originalMsg.roomId,
@@ -48,42 +53,31 @@ class MessageServiceInstaller extends Service {
                     });
 
                     if (response.ok) {
-                        console.log(`[QuantyPlugin] ✅ Response delivered via ${host}:${port}`);
+                        console.log(`[QuantyPlugin] ✅ Response delivered via ${url}`);
                         return;
                     }
                 } catch (e) {
-                    // Продолжаем цикл по хостам
+                    // Try next URL
                 }
             }
-            
-            // Если все локальные хосты провалились, пробуем порт 3000 (внутренний дефолт ElizaOS)
-            try {
-                await fetch('http://127.0.0.1:3000/api/messaging/submit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        channel_id: originalMsg.channel_id || originalMsg.roomId,
-                        message_server_id: '00000000-0000-0000-0000-000000000000',
-                        author_id: runtime.agentId,
-                        content: text,
-                        source_type: 'agent_response'
-                    })
-                });
-            } catch (e) {}
+            console.error('[QuantyPlugin] ❌ All bus delivery attempts failed');
         };
 
         // ЭКСТРЕМАЛЬНЫЙ МОНКИ-ПАТЧИНГ (Omega Option)
-        setTimeout(() => {
+        // Пытаемся найти сервис несколько раз, если он не появился сразу
+        const applyPatch = () => {
             try {
-                const busService = runtime.getService('message-bus-service' as any);
+                const allServices = (runtime as any).services;
+                let busService = runtime.getService('message-bus-service' as any);
+                
+                if (!busService && allServices) {
+                    busService = Array.from(allServices.values()).find((s: any) => 
+                        s?.constructor?.name?.includes('MessageBus') || s?.serviceType?.includes('message-bus')
+                    );
+                }
+
                 if (busService) {
                     runtime.logger.info(`[QuantyPlugin] Found MessageBusService. Applying monkey-patch...`);
-                    
-                    // ХАК: Вручную добавляем подписку, если сервис её потерял
-                    if ((busService as any).subscribedServers) {
-                        (busService as any).subscribedServers.add('00000000-0000-0000-0000-000000000000');
-                    }
-
                     const originalHandle = (busService as any).handleIncomingMessage;
                     
                     (busService as any).handleIncomingMessage = async (data: any) => {
@@ -98,7 +92,6 @@ class MessageServiceInstaller extends Service {
                                     roomId: data.channel_id || data.roomId
                                 };
 
-                                // Пытаемся отправить ответ
                                 const responseCallback = async (content: any) => {
                                     if (content.text) {
                                         await sendResponseToBus(mappedMessage.roomId, content.text, data);
@@ -111,17 +104,27 @@ class MessageServiceInstaller extends Service {
                         } catch (err) {
                             console.error('[QuantyPlugin] Error in monkey-patch:', err);
                         }
-                        
                         if (typeof originalHandle === 'function') {
                             return originalHandle.call(busService, data);
                         }
                     };
-                    runtime.logger.success('[QuantyPlugin] MessageBusService monkey-patched successfully');
+                    runtime.logger.success('[QuantyPlugin] MessageBusService monkey-patched');
+                    return true;
                 }
             } catch (e) {
-                runtime.logger.error('[QuantyPlugin] Monkey-patch failed:', e);
+                console.error('[QuantyPlugin] Patch attempt failed:', e);
             }
-        }, 5000);
+            return false;
+        };
+
+        // Запускаем попытки патча
+        let attempts = 0;
+        const patchInterval = setInterval(() => {
+            attempts++;
+            if (applyPatch() || attempts > 10) {
+                clearInterval(patchInterval);
+            }
+        }, 3000);
 
         // Логика синхронизации подключений
         runtime.registerEvent(EventType.ENTITY_JOINED, async (payload: EntityPayload) => {

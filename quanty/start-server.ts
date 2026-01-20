@@ -18,113 +18,75 @@ async function main() {
 
   const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000');
   
-  // CRITICAL: Tell ElizaOS where its own message server is.
-  // This fixes the "Error fetching agent servers" error.
+  // 1. CRITICAL: Tell ElizaOS where its own message server is.
   process.env.CENTRAL_MESSAGE_SERVER_URL = `http://127.0.0.1:${port}`;
-  console.log(`🌍 Setting Central Message Server URL: ${process.env.CENTRAL_MESSAGE_SERVER_URL}`);
+  console.log(`🌍 Central Message Server URL: ${process.env.CENTRAL_MESSAGE_SERVER_URL}`);
 
   console.log('🎬 Starting AgentServer...');
-  console.log(`🔍 Project Path: ${projectPath}`);
 
-  // Determine Client Path (Handle potential nesting from Vite)
+  // 2. Resolve Client Path
   let clientPath = path.resolve(__dirname, 'dist/frontend');
-  
-  // If Vite nested it (common issue), check the nested path
   const nestedPath = path.resolve(__dirname, 'dist/frontend/src/frontend');
   if (!fs.existsSync(path.join(clientPath, 'index.html')) && fs.existsSync(path.join(nestedPath, 'index.html'))) {
-      console.log('📂 Detected nested frontend structure, adjusting clientPath...');
       clientPath = nestedPath;
   }
 
-  console.log(`🔍 Final Client Path: ${clientPath}`);
-  
-  // Verify frontend files exist
-  if (fs.existsSync(path.join(clientPath, 'index.html'))) {
-      console.log('✅ Custom frontend found (index.html exists)');
-  } else {
-      console.warn('⚠️ WARNING: Custom frontend NOT found at expected path!');
-      console.warn('   Checking dist contents:');
-      try {
-          const { execSync } = await import('child_process');
-          console.log(execSync('ls -R dist').toString());
-      } catch (e) {}
-  }
-
+  // 3. Initialize Server
   try {
     await server.initialize({
       clientPath: clientPath,
       dataDir: dataDir,
-      serverOptions: {
-        trustProxy: true,
-      },
+      serverOptions: { trustProxy: true },
     });
-    // CRITICAL FIX FOR RAILWAY: Set trust proxy to 1 (trust first proxy)
-    // This avoids ERR_ERL_PERMISSIVE_TRUST_PROXY while solving ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
     server.app.set('trust proxy', 1);
     
-    // Global error handler to catch ValidationErrors from rate limiter
-    server.app.use((err: any, req: any, res: any, next: any) => {
-        if (err.name === 'ValidationError') {
-            console.error('🛑 Rate Limit Validation Error:', err.message);
-            console.error('Help:', err.help);
-        }
-        next(err);
+    // Health check
+    server.app.get('/health', (req, res) => res.status(200).send('OK'));
+
+    // Custom root route
+    server.app.get('/', (req, res) => {
+        const indexHtml = path.join(clientPath, 'index.html');
+        if (fs.existsSync(indexHtml)) res.sendFile(indexHtml);
+        else res.status(404).send('Custom UI not found');
     });
 
-    console.log('✅ AgentServer initialized locally');
+    console.log('✅ AgentServer initialized');
   } catch (initError: any) {
-    console.error('❌ CRITICAL: Failed to initialize AgentServer');
-    console.error('Error Message:', initError.message);
+    console.error('❌ Failed to initialize AgentServer:', initError.message);
     throw initError;
   }
 
-  // Force root route to serve our index.html (Bypass library defaults)
-  server.app.get('/', (req, res) => {
-      const indexHtml = path.join(clientPath, 'index.html');
-      if (fs.existsSync(indexHtml)) {
-          res.sendFile(indexHtml);
-      } else {
-          res.status(404).send('Custom UI index.html not found at ' + clientPath);
-      }
-  });
+  // 4. CRITICAL FIX: START LISTENING BEFORE STARTING AGENTS
+  // This ensures the HTTP port is open when agents/MessageBus try to connect to it.
+  console.log(`🚀 Binding AgentServer to port ${port}...`);
+  await server.start(port);
+  console.log(`✅ Server is now listening on port ${port}`);
 
-  // Health check for Railway
-  server.app.get('/health', (req, res) => {
-      res.status(200).send('OK');
-  });
-
+  // 5. Start Agents
   try {
     const project = await import(projectPath);
     const projectModule = project.default || project;
 
     if (projectModule.agents && Array.isArray(projectModule.agents)) {
-      console.log(`🚀 Starting ${projectModule.agents.length} agent(s)...`);
-      
-      // Pass the agents array directly as expected by standard ElizaOS server
+      console.log(`🤖 Starting ${projectModule.agents.length} agent(s)...`);
       await server.startAgents(projectModule.agents);
-      
-      console.log(`✅ Started ${projectModule.agents.length} agent(s) successfully`);
+      console.log(`✅ All agents started and registered.`);
     } else {
-      console.error('❌ Error: No agents found in project.');
       throw new Error('No agents found in project');
     }
   } catch (err) {
-    console.error('❌ Failed to load project bundle:', err);
+    console.error('❌ Failed to start agents:', err);
     throw err;
   }
 
-  // Final check to ensure we don't have a mismatch in logs
-  console.log(`🚀 Binding AgentServer... (Internal fallback: 3000, External: ${port})`);
-  await server.start(port);
-
   console.log(`
- ✅ Server is ACTIVE
- ✅ Internal API listener: http://127.0.0.1:3000
- ✅ Railway Gateway: http://localhost:${port}
+ 🏁 QUANTY SYSTEM FULLY OPERATIONAL
+ 🏠 UI: http://localhost:${port}
+ 🔗 Internal: http://127.0.0.1:${port}
 `);
 }
 
 main().catch((error) => {
-  console.error('Failed to start server:', error);
+  console.error('Fatal startup error:', error);
   process.exit(1);
 });
