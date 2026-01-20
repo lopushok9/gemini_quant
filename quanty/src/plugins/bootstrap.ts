@@ -16,48 +16,59 @@ class MessageServiceInstaller extends Service {
     static async start(runtime: IAgentRuntime): Promise<Service> {
         const service = new MessageServiceInstaller(runtime);
 
-        runtime.logger.info('[QuantyPlugin] Installing QuantyMessageService...');
+        runtime.logger.info('[QuantyPlugin] Rescuing Message Delivery Chain...');
 
-        // 1. Устанавливаем наш сервис сообщений
+        // 1. Устанавливаем наш сервис
         const myMessageService = new QuantyMessageService();
         runtime.messageService = myMessageService;
 
-        // 2. ХАК ДЛЯ RAILWAY/MESSAGE-BUS:
-        // Находим сервис шины сообщений и подписываемся на него напрямую.
-        // Это гарантирует, что даже если внутренняя маршрутизация ElizaOS сломана,
-        // мы все равно получим сообщение.
+        // 2. ДИАГНОСТИКА СЕРВИСОВ
+        const allServices = (runtime as any).services;
+        if (allServices) {
+            console.log('[QuantyPlugin] Registered Services:', Array.from(allServices.keys()));
+        }
+
+        // 3. ЭКСТРЕМАЛЬНЫЙ ХУК (Nuclear Option)
         setTimeout(() => {
             try {
-                const messageBus = runtime.getService('message-bus-service') as any;
-                if (messageBus) {
-                    runtime.logger.info('[QuantyPlugin] MessageBusService found! Hooking into direct message stream...');
+                // Пытаемся найти сервис шины под любым именем
+                const busService = runtime.getService('message-bus-service' as any) || 
+                                 runtime.getService('message-bus' as any) ||
+                                 Array.from(allServices.values()).find((s: any) => s.constructor.name.includes('MessageBus'));
+
+                if (busService) {
+                    runtime.logger.info(`[QuantyPlugin] Bus Service Found: ${busService.constructor.name}. Hooking...`);
                     
-                    // Подписываемся на ВСЕ сообщения шины
-                    messageBus.on('message', async (message: any) => {
-                        // Если сообщение адресовано в комнату, где есть наш агент
-                        // (или если это Socket.io сообщение, которое мы видим в логах)
-                        if (message.userId === runtime.agentId) return; // Игнорируем свои
+                    // Хак: Если сервис застрял на fetch, мы подсовываем ему "правду"
+                    if ((busService as any).subscribedServers) {
+                        (busService as any).subscribedServers.add('00000000-0000-0000-0000-000000000000');
+                    }
 
-                        runtime.logger.info(`[QuantyPlugin] Direct Bus Hook: Captured message ${message.id}`);
-                        
-                        try {
-                            // Форсируем обработку сообщения нашим сервисом
-                            await myMessageService.handleMessage(runtime, message);
-                        } catch (err) {
-                            runtime.logger.error('[QuantyPlugin] Error in Direct Bus Hook:', err);
-                        }
-                    });
-                } else {
-                    runtime.logger.warn('[QuantyPlugin] MessageBusService NOT found. Fallback to standard routing.');
+                    // Подписка на низкоуровневые события, если они есть
+                    const emitter = (busService as any).emitter || busService;
+                    if (typeof emitter.on === 'function') {
+                        emitter.on('message', async (msg: any) => {
+                            if (msg.userId === runtime.agentId || msg.author_id === runtime.agentId) return;
+                            runtime.logger.info(`[QuantyPlugin] ⚡ DIRECT HOOK TRAP: Message ${msg.id}`);
+                            await myMessageService.handleMessage(runtime, msg);
+                        });
+                    }
                 }
+
+                // РЕЗЕРВНЫЙ ПЛАН: Подписка на глобальные события рантайма
+                runtime.registerEvent('new_message' as any, async (msg: any) => {
+                    runtime.logger.info('[QuantyPlugin] ⚡ RUNTIME EVENT TRAP: new_message');
+                    await myMessageService.handleMessage(runtime, msg);
+                });
+
             } catch (e) {
-                runtime.logger.error('[QuantyPlugin] Failed to hook into MessageBus:', e);
+                runtime.logger.error('[QuantyPlugin] Rescue Hook Failed:', e);
             }
-        }, 5000); // Даем время на инициализацию всех сервисов
+        }, 10000);
 
-        runtime.logger.success('[QuantyPlugin] QuantyMessageService installed and hooked');
+        runtime.logger.success('[QuantyPlugin] Rescue Hook Armed');
 
-        // Логика синхронизации подключений (Connection Sync)
+        // Логика синхронизации подключений
         runtime.registerEvent(EventType.ENTITY_JOINED, async (payload: EntityPayload) => {
             const { entityId, roomId, worldId, source } = payload;
             
