@@ -72,6 +72,11 @@ async function main() {
       }
   });
 
+  // Health check for Railway
+  server.app.get('/health', (req, res) => {
+      res.status(200).send('OK');
+  });
+
   try {
     const project = await import(projectPath);
     const projectModule = project.default || project;
