@@ -51,6 +51,10 @@ async function main() {
         trustProxy: true,
       },
     });
+    // CRITICAL FIX FOR RAILWAY: Explicitly enable trust proxy on the Express app
+    // The serverOptions above might not be propagating correctly in this version
+    server.app.enable('trust proxy');
+    
     console.log('✅ AgentServer initialized locally');
   } catch (initError: any) {
     console.error('❌ CRITICAL: Failed to initialize AgentServer');
