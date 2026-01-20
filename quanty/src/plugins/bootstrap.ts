@@ -16,60 +16,62 @@ class MessageServiceInstaller extends Service {
     static async start(runtime: IAgentRuntime): Promise<Service> {
         const service = new MessageServiceInstaller(runtime);
 
-        runtime.logger.info('[QuantyPlugin] Rescuing Message Delivery Chain...');
+        runtime.logger.info('[QuantyPlugin] Installing logic overrides...');
 
-        // 1. Устанавливаем наш сервис
         const myMessageService = new QuantyMessageService();
         runtime.messageService = myMessageService;
 
-        // 2. ДИАГНОСТИКА СЕРВИСОВ
-        const allServices = (runtime as any).services;
-        if (allServices) {
-            console.log('[QuantyPlugin] Registered Services:', Array.from(allServices.keys()));
-        }
-
-        // 3. ЭКСТРЕМАЛЬНЫЙ ХУК (Nuclear Option)
+        // ЭКСТРЕМАЛЬНЫЙ МОНКИ-ПАТЧИНГ (Omega Option)
+        // Мы внедряемся в системные методы ElizaOS, чтобы починить доставку сообщений
         setTimeout(() => {
             try {
-                // Пытаемся найти сервис шины под любым именем
-                const busService = runtime.getService('message-bus-service' as any) || 
-                                 runtime.getService('message-bus' as any) ||
-                                 Array.from(allServices.values()).find((s: any) => s.constructor.name.includes('MessageBus'));
-
+                const busService = runtime.getService('message-bus-service' as any);
+                
                 if (busService) {
-                    runtime.logger.info(`[QuantyPlugin] Bus Service Found: ${busService.constructor.name}. Hooking...`);
+                    runtime.logger.info(`[QuantyPlugin] Found MessageBusService. Applying monkey-patch...`);
                     
-                    // Хак: Если сервис застрял на fetch, мы подсовываем ему "правду"
-                    if ((busService as any).subscribedServers) {
-                        (busService as any).subscribedServers.add('00000000-0000-0000-0000-000000000000');
-                    }
+                    // Сохраняем оригинальный метод (на всякий случай)
+                    const originalHandle = (busService as any).handleIncomingMessage;
+                    
+                    // Перезаписываем системный метод своей логикой
+                    (busService as any).handleIncomingMessage = async (data: any) => {
+                        console.log('[QuantyPlugin] ⚡ INTERCEPTED by Monkey-Patch:', data?.id);
+                        
+                        try {
+                            // Форсируем обработку сообщения, не дожидаясь проверок подписок
+                            // которые ломаются на Railway
+                            if (data && data.content && data.author_id !== runtime.agentId) {
+                                // Преобразуем формат данных шины в формат Memory, который ждет наш сервис
+                                const mappedMessage = {
+                                    ...data,
+                                    userId: data.author_id,
+                                    content: { text: data.content },
+                                    roomId: data.channel_id || data.roomId
+                                };
+                                
+                                await myMessageService.handleMessage(runtime, mappedMessage as any);
+                            }
+                        } catch (err) {
+                            console.error('[QuantyPlugin] Error in monkey-patch handler:', err);
+                        }
 
-                    // Подписка на низкоуровневые события, если они есть
-                    const emitter = (busService as any).emitter || busService;
-                    if (typeof emitter.on === 'function') {
-                        emitter.on('message', async (msg: any) => {
-                            if (msg.userId === runtime.agentId || msg.author_id === runtime.agentId) return;
-                            runtime.logger.info(`[QuantyPlugin] ⚡ DIRECT HOOK TRAP: Message ${msg.id}`);
-                            await myMessageService.handleMessage(runtime, msg);
-                        });
-                    }
+                        // Вызываем оригинал, чтобы не ломать внутреннее состояние системы (если он еще жив)
+                        if (typeof originalHandle === 'function') {
+                            return originalHandle.call(busService, data);
+                        }
+                    };
+                    
+                    runtime.logger.success('[QuantyPlugin] MessageBusService monkey-patched successfully');
+                } else {
+                    runtime.logger.error('[QuantyPlugin] CRITICAL: MessageBusService not found for patching!');
                 }
-
-                // РЕЗЕРВНЫЙ ПЛАН: Подписка на глобальные события рантайма
-                runtime.registerEvent('new_message' as any, async (msg: any) => {
-                    runtime.logger.info('[QuantyPlugin] ⚡ RUNTIME EVENT TRAP: new_message');
-                    await myMessageService.handleMessage(runtime, msg);
-                });
-
             } catch (e) {
-                runtime.logger.error('[QuantyPlugin] Rescue Hook Failed:', e);
+                runtime.logger.error('[QuantyPlugin] Monkey-patch failed:', e);
             }
-        }, 10000);
+        }, 15000); // Ждем 15 секунд, чтобы все системные сервисы точно загрузились
 
-        runtime.logger.success('[QuantyPlugin] Rescue Hook Armed');
-
-        // Логика синхронизации подключений
-        runtime.registerEvent(EventType.ENTITY_JOINED, async (payload: EntityPayload) => {
+        return service;
+    }
             const { entityId, roomId, worldId, source } = payload;
             
             if (entityId !== runtime.agentId) {
