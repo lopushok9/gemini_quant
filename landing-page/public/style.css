@@ -76,6 +76,7 @@ a:hover {
     flex-grow: 1;
     display: flex;
     justify-content: center;
+    align-items: center; /* Vertically center all links and buttons */
 }
 
 .nav-links a {
@@ -83,6 +84,8 @@ a:hover {
     font-size: 0.95rem;
     color: var(--color-text-light);
     font-weight: 500;
+    display: flex;
+    align-items: center;
 }
 
 .nav-agent-btn {
@@ -94,6 +97,9 @@ a:hover {
     box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
     transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
     margin: 0 1.5rem;
+    display: inline-flex; /* Ensure padding and alignment work correctly */
+    align-items: center;
+    justify-content: center;
 }
 
 .nav-agent-btn:hover {
