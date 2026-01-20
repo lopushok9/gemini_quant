@@ -22,57 +22,41 @@ class MessageServiceInstaller extends Service {
 
         // Вспомогательная функция для отправки ответа обратно в шину (как в Otaku)
         const sendResponseToBus = async (roomId: string, text: string, originalMsg: any) => {
-            const port = process.env.PORT || process.env.SERVER_PORT || '3000';
-            // Используем 127.0.0.1 вместо localhost для стабильности в Docker
-            const url = `http://127.0.0.1:${port}/api/messaging/submit`;
+            // ЛОГИ ПОКАЗАЛИ: Внутренний сервер всегда слушает на 3000, игнорируя внешние порты Railway.
+            // Поэтому мы сразу пробуем 3000 для внутренней доставки.
+            const ports = ['3000', process.env.PORT, process.env.SERVER_PORT].filter(Boolean);
             
-            try {
-                const payload = {
-                    channel_id: originalMsg.channel_id || originalMsg.roomId,
-                    server_id: originalMsg.server_id || '00000000-0000-0000-0000-000000000000',
-                    author_id: runtime.agentId,
-                    content: text,
-                    source_type: 'agent_response',
-                    metadata: {
-                        agent_id: runtime.agentId,
-                        agentName: runtime.character.name
+            for (const port of ports) {
+                const url = `http://127.0.0.1:${port}/api/messaging/submit`;
+                try {
+                    const payload = {
+                        channel_id: originalMsg.channel_id || originalMsg.roomId,
+                        // Исправляем депрекацию: server_id -> message_server_id
+                        message_server_id: originalMsg.message_server_id || originalMsg.server_id || '00000000-0000-0000-0000-000000000000',
+                        author_id: runtime.agentId,
+                        content: text,
+                        source_type: 'agent_response',
+                        metadata: {
+                            agent_id: runtime.agentId,
+                            agentName: runtime.character.name
+                        }
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        console.log(`[QuantyPlugin] ✅ Response delivered to bus via port ${port}`);
+                        return; // Успешно отправили, выходим из цикла
                     }
-                };
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server responded with ${response.status}: ${await response.text()}`);
-                }
-
-                console.log('[QuantyPlugin] ✅ Response delivered to bus');
-            } catch (err: any) {
-                console.error(`[QuantyPlugin] ❌ Bus Delivery Failed (${url}):`, err.message);
-                
-                // Резервная попытка на порт 3000, если основной порт (например 8080) не сработал
-                if (port !== '3000') {
-                    try {
-                        const fallbackUrl = `http://127.0.0.1:3000/api/messaging/submit`;
-                        await fetch(fallbackUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                channel_id: originalMsg.channel_id || originalMsg.roomId,
-                                server_id: '00000000-0000-0000-0000-000000000000',
-                                author_id: runtime.agentId,
-                                content: text,
-                                source_type: 'agent_response',
-                                metadata: { agent_id: runtime.agentId, agentName: runtime.character.name }
-                            })
-                        });
-                        console.log('[QuantyPlugin] ✅ Response delivered via fallback (3000)');
-                    } catch (e) {}
+                } catch (err: any) {
+                    // Пробуем следующий порт, если этот не сработал
                 }
             }
+            console.error('[QuantyPlugin] ❌ All bus delivery attempts failed');
         };
 
         // ЭКСТРЕМАЛЬНЫЙ МОНКИ-ПАТЧИНГ (Omega Option)
