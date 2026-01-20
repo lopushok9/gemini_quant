@@ -75,13 +75,10 @@ async function main() {
     if (projectModule.agents && Array.isArray(projectModule.agents)) {
       console.log(`🚀 Starting ${projectModule.agents.length} agent(s)...`);
       
-      // OTAKU-STYLE UNWRAP: Pass characters and plugins separately
-      // This is often required by newer @elizaos/server versions
-      const characters = projectModule.agents.map((a: any) => a.character);
-      const allPlugins = projectModule.agents.flatMap((a: any) => a.plugins || []);
+      // Pass the agents array directly as expected by standard ElizaOS server
+      await server.startAgents(projectModule.agents);
       
-      await server.startAgents(characters, allPlugins);
-      console.log(`✅ Started ${characters.length} agent(s) successfully`);
+      console.log(`✅ Started ${projectModule.agents.length} agent(s) successfully`);
     } else {
       console.error('❌ Error: No agents found in project.');
       throw new Error('No agents found in project');
