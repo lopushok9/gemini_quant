@@ -85,6 +85,23 @@ a:hover {
     font-weight: 500;
 }
 
+.nav-agent-btn {
+    background-color: #3B82F6 !important;
+    color: white !important;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+    transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+    margin: 0 1.5rem;
+}
+
+.nav-agent-btn:hover {
+    background-color: #2563EB !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 10px rgba(59, 130, 246, 0.3);
+}
+
 .nav-actions {
     width: 120px;
     /* Balance the logo width for true center of links */
