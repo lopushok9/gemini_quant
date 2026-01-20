@@ -7,6 +7,7 @@ import {
     ChannelType,
 } from '@elizaos/core';
 import { QuantyMessageService } from '../services/quantyMessageService.ts';
+import internalMessageBus from '../bus.ts';
 
 class MessageServiceInstaller extends Service {
     static serviceType = 'quanty-message-installer';
@@ -21,46 +22,29 @@ class MessageServiceInstaller extends Service {
         runtime.messageService = myMessageService;
 
         // Вспомогательная функция для отправки ответа обратно в шину
+        // Используем внутренний EventEmitter вместо HTTP-запросов (работает на Railway)
         const sendResponseToBus = async (roomId: string, text: string, originalMsg: any) => {
-            const port = process.env.PORT || process.env.SERVER_PORT || '3000';
-            const centralUrl = process.env.CENTRAL_MESSAGE_SERVER_URL;
-            
-            // Формируем список URL для попыток отправки
-            const urls = [];
-            if (centralUrl) urls.push(`${centralUrl}/api/messaging/submit`);
-            urls.push(`http://127.0.0.1:${port}/api/messaging/submit`);
-            urls.push(`http://127.0.0.1:3000/api/messaging/submit`);
-            urls.push(`http://localhost:${port}/api/messaging/submit`);
-
-            for (const url of urls) {
-                try {
-                    const payload = {
-                        channel_id: originalMsg.channel_id || originalMsg.roomId,
-                        message_server_id: originalMsg.message_server_id || originalMsg.server_id || '00000000-0000-0000-0000-000000000000',
-                        author_id: runtime.agentId,
-                        content: text,
-                        source_type: 'agent_response',
-                        metadata: {
-                            agent_id: runtime.agentId,
-                            agentName: runtime.character.name
-                        }
-                    };
-
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        console.log(`[QuantyPlugin] ✅ Response delivered via ${url}`);
-                        return;
+            try {
+                const messagePayload = {
+                    id: crypto.randomUUID(),
+                    channel_id: originalMsg.channel_id || originalMsg.roomId,
+                    server_id: originalMsg.message_server_id || originalMsg.server_id || '00000000-0000-0000-0000-000000000000',
+                    author_id: runtime.agentId,
+                    content: text,
+                    source_type: 'agent_response',
+                    created_at: Date.now(),
+                    metadata: {
+                        agent_id: runtime.agentId,
+                        agentName: runtime.character.name
                     }
-                } catch (e) {
-                    // Try next URL
-                }
+                };
+
+                // Эмитим через внутренний bus — это работает в том же процессе
+                internalMessageBus.emit('agent_response', messagePayload);
+                console.log(`[QuantyPlugin] ✅ Response delivered via internalMessageBus`);
+            } catch (e) {
+                console.error('[QuantyPlugin] ❌ Failed to deliver response via internalMessageBus:', e);
             }
-            console.error('[QuantyPlugin] ❌ All bus delivery attempts failed');
         };
 
         // ЭКСТРЕМАЛЬНЫЙ МОНКИ-ПАТЧИНГ (Omega Option)

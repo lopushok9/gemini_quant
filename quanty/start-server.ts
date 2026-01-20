@@ -17,10 +17,6 @@ async function main() {
   const projectPath = path.resolve(__dirname, 'dist/index.js');
 
   const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000');
-  
-  // 1. CRITICAL: Tell ElizaOS where its own message server is.
-  process.env.CENTRAL_MESSAGE_SERVER_URL = `http://127.0.0.1:${port}`;
-  console.log(`🌍 Central Message Server URL: ${process.env.CENTRAL_MESSAGE_SERVER_URL}`);
 
   console.log('🎬 Starting AgentServer...');
 
@@ -79,10 +75,40 @@ async function main() {
     throw err;
   }
 
+  // 6. Setup internal bus -> SocketIO bridge for agent responses
+  // This allows agent responses to reach the UI without HTTP calls to localhost
+  try {
+    const busModule = await import(path.resolve(__dirname, 'dist/bus.js'));
+    const internalMessageBus = busModule.default;
+    
+    internalMessageBus.on('agent_response', (payload: any) => {
+      console.log('[Server] 📤 Received agent_response, broadcasting via SocketIO');
+      
+      if ((server as any).socketIO && payload.channel_id) {
+        (server as any).socketIO.to(payload.channel_id).emit('messageBroadcast', {
+          senderId: payload.author_id,
+          senderName: payload.metadata?.agentName || 'Quanty',
+          text: payload.content,
+          roomId: payload.channel_id,
+          serverId: payload.server_id,
+          createdAt: payload.created_at || Date.now(),
+          source: payload.source_type,
+          id: payload.id,
+        });
+        console.log(`[Server] ✅ Broadcasted to channel ${payload.channel_id}`);
+      } else {
+        console.warn('[Server] ⚠️ SocketIO not available or missing channel_id');
+      }
+    });
+    
+    console.log('✅ Internal bus -> SocketIO bridge configured');
+  } catch (busErr) {
+    console.warn('⚠️ Could not setup internal bus bridge:', busErr);
+  }
+
   console.log(`
  🏁 QUANTY SYSTEM FULLY OPERATIONAL
  🏠 UI: http://localhost:${port}
- 🔗 Internal: http://127.0.0.1:${port}
 `);
 }
 

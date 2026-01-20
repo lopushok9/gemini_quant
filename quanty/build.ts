@@ -30,7 +30,7 @@ async function build() {
       (async () => {
         console.log('📦 Bundling with Bun...');
         const result = await Bun.build({
-          entrypoints: ['./src/index.ts'],
+          entrypoints: ['./src/index.ts', './src/bus.ts'],
           outdir: './dist',
           target: 'node',
           format: 'esm',
