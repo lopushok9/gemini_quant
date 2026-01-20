@@ -16,15 +16,48 @@ class MessageServiceInstaller extends Service {
     static async start(runtime: IAgentRuntime): Promise<Service> {
         const service = new MessageServiceInstaller(runtime);
 
-        runtime.logger.info('[QuantyPlugin] Installing QuantyMessageService (Post-Initialization)...');
+        runtime.logger.info('[QuantyPlugin] Installing QuantyMessageService...');
 
-        // Заменяем стандартный сервис на наш (как в Otaku)
-        runtime.messageService = new QuantyMessageService();
+        // 1. Устанавливаем наш сервис сообщений
+        const myMessageService = new QuantyMessageService();
+        runtime.messageService = myMessageService;
 
-        runtime.logger.success('[QuantyPlugin] QuantyMessageService installed successfully');
+        // 2. ХАК ДЛЯ RAILWAY/MESSAGE-BUS:
+        // Находим сервис шины сообщений и подписываемся на него напрямую.
+        // Это гарантирует, что даже если внутренняя маршрутизация ElizaOS сломана,
+        // мы все равно получим сообщение.
+        setTimeout(() => {
+            try {
+                const messageBus = runtime.getService('message-bus-service') as any;
+                if (messageBus) {
+                    runtime.logger.info('[QuantyPlugin] MessageBusService found! Hooking into direct message stream...');
+                    
+                    // Подписываемся на ВСЕ сообщения шины
+                    messageBus.on('message', async (message: any) => {
+                        // Если сообщение адресовано в комнату, где есть наш агент
+                        // (или если это Socket.io сообщение, которое мы видим в логах)
+                        if (message.userId === runtime.agentId) return; // Игнорируем свои
 
-        // Логика синхронизации подключений (Connection Sync) из Otaku
-        // Это КЛЮЧЕВОЙ момент для работы MessageBus
+                        runtime.logger.info(`[QuantyPlugin] Direct Bus Hook: Captured message ${message.id}`);
+                        
+                        try {
+                            // Форсируем обработку сообщения нашим сервисом
+                            await myMessageService.handleMessage(runtime, message);
+                        } catch (err) {
+                            runtime.logger.error('[QuantyPlugin] Error in Direct Bus Hook:', err);
+                        }
+                    });
+                } else {
+                    runtime.logger.warn('[QuantyPlugin] MessageBusService NOT found. Fallback to standard routing.');
+                }
+            } catch (e) {
+                runtime.logger.error('[QuantyPlugin] Failed to hook into MessageBus:', e);
+            }
+        }, 5000); // Даем время на инициализацию всех сервисов
+
+        runtime.logger.success('[QuantyPlugin] QuantyMessageService installed and hooked');
+
+        // Логика синхронизации подключений (Connection Sync)
         runtime.registerEvent(EventType.ENTITY_JOINED, async (payload: EntityPayload) => {
             const { entityId, roomId, worldId, source } = payload;
             
