@@ -51,10 +51,19 @@ async function main() {
         trustProxy: true,
       },
     });
-    // CRITICAL FIX FOR RAILWAY: Explicitly enable trust proxy on the Express app
-    // The serverOptions above might not be propagating correctly in this version
-    server.app.enable('trust proxy');
+    // CRITICAL FIX FOR RAILWAY: Set trust proxy to 1 (trust first proxy)
+    // This avoids ERR_ERL_PERMISSIVE_TRUST_PROXY while solving ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+    server.app.set('trust proxy', 1);
     
+    // Global error handler to catch ValidationErrors from rate limiter
+    server.app.use((err: any, req: any, res: any, next: any) => {
+        if (err.name === 'ValidationError') {
+            console.error('🛑 Rate Limit Validation Error:', err.message);
+            console.error('Help:', err.help);
+        }
+        next(err);
+    });
+
     console.log('✅ AgentServer initialized locally');
   } catch (initError: any) {
     console.error('❌ CRITICAL: Failed to initialize AgentServer');

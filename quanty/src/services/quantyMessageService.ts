@@ -115,15 +115,15 @@ interface MultiStepActionResult {
 
 export class QuantyMessageService implements IMessageService {
 
-    async handleMessage(
-        runtime: IAgentRuntime,
-        message: Memory,
-        callback?: HandlerCallback,
-        options?: MessageProcessingOptions
-    ): Promise<MessageProcessingResult> {
-
-        runtime.logger.info(`[QuantyMessageService] Handling message from ${message.entityId}`);
-
+        async handleMessage(
+            runtime: IAgentRuntime,
+            message: Memory,
+            callback?: HandlerCallback,
+            options?: MessageProcessingOptions
+        ): Promise<MessageProcessingResult> {
+            
+            runtime.logger.info(`[QuantyMessageService] handleMessage INVOCATION from ${message.entityId} in room ${message.roomId}`);
+            runtime.logger.info(`[QuantyMessageService] Message text: ${message.content.text?.substring(0, 50)}`);
         // 1. Ensure Message ID
         if (!message.id) {
             message.id = await runtime.createMemory(message, 'messages') as UUID;
