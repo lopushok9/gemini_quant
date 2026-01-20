@@ -16,6 +16,13 @@ async function main() {
   const dataDir = path.resolve(__dirname, './data');
   const projectPath = path.resolve(__dirname, 'dist/index.js');
 
+  const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000');
+  
+  // CRITICAL: Tell ElizaOS where its own message server is.
+  // This fixes the "Error fetching agent servers" error.
+  process.env.CENTRAL_MESSAGE_SERVER_URL = `http://127.0.0.1:${port}`;
+  console.log(`🌍 Setting Central Message Server URL: ${process.env.CENTRAL_MESSAGE_SERVER_URL}`);
+
   console.log('🎬 Starting AgentServer...');
   console.log(`🔍 Project Path: ${projectPath}`);
 
