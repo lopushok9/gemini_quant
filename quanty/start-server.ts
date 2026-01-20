@@ -113,9 +113,6 @@ async function main() {
     throw err;
   }
 
-  // Use 3000 as the absolute default to match ElizaOS internal expectations
-  const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000');
-  
   // Final check to ensure we don't have a mismatch in logs
   console.log(`🚀 Binding AgentServer... (Internal fallback: 3000, External: ${port})`);
   await server.start(port);
