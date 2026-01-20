@@ -1,4 +1,12 @@
-import { Service, type IAgentRuntime, type Plugin } from '@elizaos/core';
+import { 
+    Service, 
+    type IAgentRuntime, 
+    type Plugin, 
+    type EntityPayload, 
+    EventType,
+    ChannelType,
+    createUniqueUuid
+} from '@elizaos/core';
 import { QuantyMessageService } from '../services/quantyMessageService.ts';
 
 class MessageServiceInstaller extends Service {
@@ -8,65 +16,50 @@ class MessageServiceInstaller extends Service {
     static async start(runtime: IAgentRuntime): Promise<Service> {
         const service = new MessageServiceInstaller(runtime);
 
-        runtime.logger.info('[QuantyPlugin] Installing QuantyMessageService...');
-        console.log('[QuantyPlugin] Current Service:', runtime.messageService?.constructor?.name);
+        runtime.logger.info('[QuantyPlugin] Installing QuantyMessageService (Post-Initialization)...');
 
-        // Заменяем стандартный сервис на наш
+        // Заменяем стандартный сервис на наш (как в Otaku)
         runtime.messageService = new QuantyMessageService();
-        console.log('[QuantyPlugin] New Service Set:', runtime.messageService?.constructor?.name);
 
         runtime.logger.success('[QuantyPlugin] QuantyMessageService installed successfully');
 
-        // Слушаем присоединение сущностей к комнатам
-        runtime.registerEvent('ENTITY_JOINED' as any, async (payload: any) => {
-            const { entityId, roomId, worldId } = payload;
-            console.log(`[QuantyPlugin] ENTITY_JOINED: ${entityId} in ${roomId}`);
+        // Логика синхронизации подключений (Connection Sync) из Otaku
+        // Это КЛЮЧЕВОЙ момент для работы MessageBus
+        runtime.registerEvent(EventType.ENTITY_JOINED, async (payload: EntityPayload) => {
+            const { entityId, roomId, worldId, source } = payload;
             
             if (entityId !== runtime.agentId) {
-                runtime.logger.info(`[QuantyPlugin] Entity ${entityId} joined room ${roomId}. Adding agent ${runtime.agentId} to participants...`);
+                runtime.logger.info(`[QuantyPlugin] New entity joined: ${entityId}. Syncing connection...`);
 
                 try {
-                    // 1. Добавляем агента в участники в БД (через метод рантайма)
-                    await runtime.addParticipant(runtime.agentId, roomId);
-
-                    // 2. Гарантируем, что рантайм видит эту комнату
-                    await runtime.ensureRoomExists({
-                        id: roomId,
+                    // Используем ensureConnection вместо простых addParticipant/ensureRoomExists.
+                    // Это уведомляет MessageBus о том, что агент должен получать сообщения из этого канала.
+                    await runtime.ensureConnection({
+                        entityId: entityId,
+                        roomId: roomId,
                         name: `Chat-${String(roomId).substring(0, 8)}`,
-                        agentId: runtime.agentId,
-                        worldId: worldId || runtime.agentId,
+                        source: source || 'socketio',
                         channelId: String(roomId),
-                        serverId: worldId || runtime.agentId,
-                        source: 'socketio',
-                        type: 'GROUP' as any
+                        type: ChannelType.GROUP,
+                        worldId: worldId || runtime.agentId,
                     });
 
-                    runtime.logger.success(`[QuantyPlugin] Agent successfully added to room ${roomId}`);
+                    runtime.logger.success(`[QuantyPlugin] Connection synced for entity ${entityId} in room ${roomId}`);
                 } catch (err) {
-                    runtime.logger.error(`[QuantyPlugin] Failed to add agent to room ${roomId}:`, err);
+                    runtime.logger.error(`[QuantyPlugin] Failed to sync connection:`, err);
                 }
             }
         });
 
-        // Слушаем входящие сообщения напрямую, чтобы обойти ограничения MessageBus
+        // Слушаем входящие сообщения (резервный механизм)
         runtime.registerEvent('MESSAGE_RECEIVED' as any, async (payload: any) => {
-            console.log('[QuantyPlugin] MESSAGE_RECEIVED event fired!');
             const { message, callback } = payload;
+            if (message.userId === runtime.agentId) return;
 
-            // Игнорируем свои собственные сообщения
-            if (message.userId === runtime.agentId) {
-                console.log('[QuantyPlugin] Ignoring own message');
-                return;
-            }
-
-            runtime.logger.info(`[QuantyPlugin] MESSAGE_RECEIVED event intercepted. Sender: ${message.userId}. Forcing handleMessage...`);
-            console.log('[QuantyPlugin] Using Service:', runtime.messageService?.constructor?.name);
+            runtime.logger.info(`[QuantyPlugin] MESSAGE_RECEIVED event intercepted.`);
 
             try {
-                // Если стандартный механизм не сработал (мы это поймем по отсутствию реакции),
-                // этот вызов гарантирует ответ. 
-                // QuantyMessageService внутри себя имеет логику дедупликации/проверки (или мы добавим).
-                // Но пока просто форсируем ответ.
+                // Вызываем напрямую, если основной цикл через MessageService не сработал
                 await runtime.messageService!.handleMessage(runtime, message, callback);
             } catch (error) {
                 runtime.logger.error('[QuantyPlugin] Error handling intercepted message:', error);
@@ -81,6 +74,6 @@ class MessageServiceInstaller extends Service {
 
 export const quantyBootstrapPlugin: Plugin = {
     name: 'quanty-bootstrap',
-    description: 'Bootstraps Quanty with custom message handling',
+    description: 'Bootstraps Quanty with custom message handling and connection syncing',
     services: [MessageServiceInstaller],
 };
