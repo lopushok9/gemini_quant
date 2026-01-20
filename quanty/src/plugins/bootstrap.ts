@@ -50,11 +50,21 @@ class MessageServiceInstaller extends Service {
         };
 
         // ЭКСТРЕМАЛЬНЫЙ МОНКИ-ПАТЧИНГ (Omega Option)
+        // Уменьшаем таймаут до 5 секунд для более быстрой инициализации
         setTimeout(() => {
             try {
-                const busService = runtime.getService('message-bus-service' as any);
+                const allServices = (runtime as any).services;
+                let busService = runtime.getService('message-bus-service' as any);
+                
+                // Если по имени не нашли, ищем по типу или конструктору
+                if (!busService && allServices) {
+                    busService = Array.from(allServices.values()).find((s: any) => 
+                        s?.constructor?.name?.includes('MessageBus') || s?.serviceType?.includes('message-bus')
+                    );
+                }
+
                 if (busService) {
-                    runtime.logger.info(`[QuantyPlugin] Found MessageBusService. Applying monkey-patch with callback...`);
+                    runtime.logger.info(`[QuantyPlugin] Found MessageBusService (${busService.constructor.name}). Applying monkey-patch...`);
                     const originalHandle = (busService as any).handleIncomingMessage;
                     
                     (busService as any).handleIncomingMessage = async (data: any) => {
@@ -64,13 +74,12 @@ class MessageServiceInstaller extends Service {
                                 // 1. Исправляем маппинг сообщения
                                 const mappedMessage = {
                                     ...data,
-                                    entityId: data.author_id, // Добавляем entityId для логов и рантайма
+                                    entityId: data.author_id,
                                     userId: data.author_id,
                                     content: { text: data.content },
                                     roomId: data.channel_id || data.roomId
                                 };
 
-                                // 2. Создаем колбэк для отправки ответа
                                 const callback = async (content: any) => {
                                     if (content.text) {
                                         await sendResponseToBus(mappedMessage.roomId, content.text, data);
@@ -78,7 +87,6 @@ class MessageServiceInstaller extends Service {
                                     return [];
                                 };
                                 
-                                // 3. Вызываем сервис с колбэком
                                 await myMessageService.handleMessage(runtime, mappedMessage as any, callback);
                             }
                         } catch (err) {
@@ -89,11 +97,14 @@ class MessageServiceInstaller extends Service {
                         }
                     };
                     runtime.logger.success('[QuantyPlugin] MessageBusService monkey-patched successfully');
+                } else {
+                    console.error('[QuantyPlugin] ❌ CRITICAL: Could not find MessageBusService for patching!');
+                    if (allServices) console.log('[QuantyPlugin] Available Services:', Array.from(allServices.keys()));
                 }
             } catch (e) {
                 runtime.logger.error('[QuantyPlugin] Monkey-patch failed:', e);
             }
-        }, 15000);
+        }, 5000);
 
         // Логика синхронизации подключений
         runtime.registerEvent(EventType.ENTITY_JOINED, async (payload: EntityPayload) => {
