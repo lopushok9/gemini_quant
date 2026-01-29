@@ -39,6 +39,36 @@ async function main() {
     // Health check
     server.app.get('/health', (req, res) => res.status(200).send('OK'));
 
+    // Custom chat endpoint that accepts conversation history (bypasses socket for history support)
+    server.app.post('/api/quanty/chat', async (req: any, res: any) => {
+        try {
+            const { message, conversationHistory, agentId } = req.body;
+
+            if (!message) {
+                return res.status(400).json({ error: 'Message is required' });
+            }
+
+            console.log('[QuantyChat] Received message with history length:', conversationHistory?.length || 0);
+
+            // Get the bus module to emit directly
+            const busModule = await import(path.resolve(__dirname, 'dist/bus.js'));
+            const internalMessageBus = busModule.default;
+
+            // Emit a custom event that our bootstrap can listen to
+            internalMessageBus.emit('quanty_chat_message', {
+                content: message,
+                conversationHistory: conversationHistory || [],
+                agentId: agentId,
+                timestamp: Date.now()
+            });
+
+            res.json({ success: true, message: 'Message queued for processing' });
+        } catch (error: any) {
+            console.error('[QuantyChat] Error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    });
+
     // Custom root route
     server.app.get('/', (req, res) => {
         const indexHtml = path.join(clientPath, 'index.html');
