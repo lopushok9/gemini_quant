@@ -156,32 +156,32 @@ const getPriceAction: Action = {
         return { text: 'Missing symbol', success: false };
       }
 
-      // Use CoinCap API (free, no rate limits issues)
-      const coinCapUrl = `https://api.coincap.io/v2/assets?search=${symbol}&limit=5`;
-      console.log('[GET_PRICE] 📡 Fetching from CoinCap:', coinCapUrl);
+      // Use Binance API (free, reliable, no rate limit issues for basic queries)
+      const pair = `${symbol.toUpperCase()}USDT`;
+      const binanceUrl = `https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`;
+      console.log('[GET_PRICE] 📡 Fetching from Binance:', binanceUrl);
 
-      const searchRes = await fetch(coinCapUrl);
-      const searchData = (await searchRes.json()) as any;
+      const res = await fetch(binanceUrl);
+      const data = (await res.json()) as any;
 
-      if (!searchData.data || searchData.data.length === 0) {
-        if (callback) await callback({ text: `Asset '${symbol.toUpperCase()}' not found.` });
+      if (data.code) {
+        // Binance error - symbol not found
+        console.log('[GET_PRICE] ❌ Binance error:', data.msg);
+        if (callback) await callback({ text: `Asset '${symbol.toUpperCase()}' not found on Binance.` });
         return { text: 'Not found', success: false };
       }
 
-      // Find exact match or use first result
-      const coin = searchData.data.find((c: any) => c.symbol.toLowerCase() === symbol) || searchData.data[0];
+      const price = parseFloat(data.lastPrice);
+      const change24h = parseFloat(data.priceChangePercent);
+      const volume = parseFloat(data.quoteVolume);
 
-      const price = parseFloat(coin.priceUsd);
-      const change24h = parseFloat(coin.changePercent24Hr);
-      const marketCap = parseFloat(coin.marketCapUsd);
+      console.log('[GET_PRICE] 💰 Found:', symbol.toUpperCase(), 'Price:', price);
 
-      console.log('[GET_PRICE] 💰 Found:', coin.name, 'Price:', price);
-
-      const responseText = `[DATA FETCHED]: ${coin.symbol} (${coin.name}) | PRICE: $${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} | 24h: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% | MCAP: $${(marketCap / 1e9).toFixed(2)}B`;
+      const responseText = `[DATA FETCHED]: ${symbol.toUpperCase()} | PRICE: $${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})} | 24h: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% | VOL: $${(volume / 1e6).toFixed(2)}M`;
       console.log('[GET_PRICE] ✅ Response:', responseText);
 
       if (callback) await callback({ text: responseText, source: message.content.source });
-      return { text: `Success: ${coin.symbol}`, data: { price, change24h, marketCap, symbol: coin.symbol, name: coin.name }, success: true };
+      return { text: `Success: ${symbol.toUpperCase()}`, data: { price, change24h, volume, symbol: symbol.toUpperCase() }, success: true };
     } catch (error) {
       console.error('[GET_PRICE] ❌ Error:', error);
       if (callback) await callback({ text: "Error fetching price data. Please try again." });
