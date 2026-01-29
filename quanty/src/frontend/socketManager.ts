@@ -66,29 +66,37 @@ class SocketManager {
     }
 
     sendMessage(agentId: string, text: string, conversationHistory?: Array<{ role: string; content: string }>) {
+        if (!this.socket) {
+            console.error('Cannot send message: Socket not connected');
+            return;
+        }
+
         const history = conversationHistory || [];
 
-        // Use REST API to send message with conversation history
-        // This bypasses ElizaOS socket processing which loses the history
-        console.log('📤 Sending message via REST API with history length:', history.length);
+        // Format history as a single string to include in the message text
+        // This is the simplest approach - append history context to the message itself
+        let messageWithContext = text;
+        if (history.length > 0) {
+            const historyText = history.slice(-6).map(m =>
+                `${m.role === 'user' ? 'User' : 'Quanty'}: ${m.content}`
+            ).join('\n');
+            messageWithContext = `[CONVERSATION HISTORY]\n${historyText}\n[END HISTORY]\n\nUser's current message: ${text}`;
+        }
 
-        fetch('/api/quanty/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: text,
-                conversationHistory: history,
-                agentId: agentId
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            console.log('✅ Message sent via REST:', data);
-        })
-        .catch(err => {
-            console.error('❌ Failed to send message via REST:', err);
+        const payload = {
+            senderId: this.userId,
+            senderName: 'Investor',
+            message: messageWithContext,
+            channelId: agentId,
+            messageServerId: '00000000-0000-0000-0000-000000000000',
+            source: 'direct'
+        };
+
+        console.log('📤 Emitting SEND_MESSAGE with history context, history length:', history.length);
+
+        this.socket.emit('message', {
+            type: SOCKET_MESSAGE_TYPE.SEND_MESSAGE,
+            payload: payload,
         });
     }
 

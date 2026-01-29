@@ -14,9 +14,6 @@ import {
     createUniqueUuid,
     composePromptFromState,
     parseKeyValueXml,
-    logger,
-    asUUID,
-    elizaLogger
 } from '@elizaos/core';
 
 
@@ -27,11 +24,8 @@ Determine the next step the assistant should take in this conversation to help t
 {{bio}}
 
 <context>
-# CURRENT REQUEST
-User says: "{{currentMessage}}"
-
-# RECENT HISTORY
-{{recentMessages}}
+# USER MESSAGE
+{{currentMessage}}
 
 # EXECUTION STATE
 **Current Step**: {{iterationCount}} of {{maxIterations}}
@@ -44,7 +38,7 @@ User says: "{{currentMessage}}"
 
 <instructions>
 # Decision Process
-1. **Analyze**: What is the user asking for in "CURRENT REQUEST"?
+1. **Analyze**: What is the user asking for?
 2. **Check History**: Have I already executed actions for this specific request in "action_history"?
 3. **Select Action**:
    - If I need data (Price, News, On-chain) -> Choose ONE action (GET_PRICE, GET_STOCK_PRICE, etc).
@@ -76,8 +70,8 @@ Generate a final, user-facing response based on the results obtained.
 {{bio}}
 
 <context>
-# ORIGINAL REQUEST
-"{{currentMessage}}"
+# USER MESSAGE
+{{currentMessage}}
 
 # DATA GATHERED
 {{actionResults}}
@@ -115,27 +109,23 @@ interface MultiStepActionResult {
 
 export class QuantyMessageService implements IMessageService {
 
-        async handleMessage(
-            runtime: IAgentRuntime,
-            message: Memory,
-            callback?: HandlerCallback,
-            options?: MessageProcessingOptions
-        ): Promise<MessageProcessingResult> {
+    async handleMessage(
+        runtime: IAgentRuntime,
+        message: Memory,
+        callback?: HandlerCallback,
+        options?: MessageProcessingOptions
+    ): Promise<MessageProcessingResult> {
 
-            runtime.logger.info(`[QuantyMessageService] handleMessage INVOCATION from ${message.entityId} in room ${message.roomId}`);
-            runtime.logger.info(`[QuantyMessageService] Message text: ${message.content.text?.substring(0, 50)}`);
+        const messageText = message.content.text || '';
+        runtime.logger.info(`[QuantyMessageService] Processing: ${messageText.substring(0, 100)}`);
 
-        // 1. Ensure Message ID (in-memory only, no DB)
+        // Ensure Message ID
         if (!message.id) {
             message.id = createUniqueUuid(runtime, v4());
         }
 
-        // 2. Extract conversation history from message content (passed from frontend)
-        const conversationHistory = (message.content as any).conversationHistory || [];
-        runtime.logger.info(`[QuantyMessageService] Received ${conversationHistory.length} messages in history`);
-
-        // 3. Run Multi-Step Core with conversation history
-        const result = await this.runMultiStepCore(runtime, message, callback, conversationHistory);
+        // Run Multi-Step Core
+        const result = await this.runMultiStepCore(runtime, message, callback);
 
         return {
             didRespond: true,
@@ -149,33 +139,28 @@ export class QuantyMessageService implements IMessageService {
     private async runMultiStepCore(
         runtime: IAgentRuntime,
         message: Memory,
-        callback?: HandlerCallback,
-        conversationHistory: Array<{ role: string; content: string }> = []
+        callback?: HandlerCallback
     ): Promise<{ responseContent: Content | null, responseMessages: Memory[], state: State }> {
 
         const MAX_ITERATIONS = 5;
         let iterationCount = 0;
         const traceActionResult: MultiStepActionResult[] = [];
-        const actionResultStrings: string[] = []; // For template injection
+        const actionResultStrings: string[] = [];
 
-        // Format conversation history for the prompt (from frontend, no DB needed)
-        const formattedHistory = this.formatConversationHistory(conversationHistory);
-        runtime.logger.info(`[QuantyMessageService] Formatted history: ${formattedHistory.substring(0, 200)}...`);
+        // Get the full message text (may include conversation history context)
+        const fullMessageText = message.content.text || '';
 
-        // Initial State - use BIO and LORE only, skip RECENT_MESSAGES (we have history from frontend)
+        // Initial State
         let state = await runtime.composeState(message, ['BIO', 'LORE']);
-        // FORCE inject the current message text and conversation history
-        state.currentMessage = message.content.text;
-        state.recentMessages = formattedHistory || 'No previous messages.';
+        state.currentMessage = fullMessageText;
 
         while (iterationCount < MAX_ITERATIONS) {
             iterationCount++;
             runtime.logger.info(`[MultiStep] Iteration ${iterationCount}/${MAX_ITERATIONS}`);
 
-            // Refresh State - skip RECENT_MESSAGES, use frontend history instead
+            // Refresh State
             state = await runtime.composeState(message, ['BIO', 'LORE']);
-            state.currentMessage = message.content.text; // Persist across loops
-            state.recentMessages = formattedHistory || 'No previous messages.'; // Use frontend history
+            state.currentMessage = fullMessageText;
             state.iterationCount = String(iterationCount);
             state.maxIterations = String(MAX_ITERATIONS);
             state.traceActionResultLength = String(traceActionResult.length);
@@ -193,8 +178,8 @@ export class QuantyMessageService implements IMessageService {
             const parsed = parseKeyValueXml(String(responseRaw));
 
             if (!parsed) {
-                runtime.logger.warn("[MultiStep] Failed to parse XML decision. Retrying or Aborting.");
-                break; // Break loop on critical failure to avoid infinite loops
+                runtime.logger.warn("[MultiStep] Failed to parse XML decision. Aborting.");
+                break;
             }
 
             const thought = (parsed.thought as string) || "";
@@ -217,7 +202,7 @@ export class QuantyMessageService implements IMessageService {
                     content: {
                         text: `Executing action: ${action}`,
                         action: action,
-                        actions: [action], // CRITICAL for ElizaOS discovery
+                        actions: [action],
                         thought: thought,
                         source: 'quanty'
                     },
@@ -227,10 +212,6 @@ export class QuantyMessageService implements IMessageService {
                 let actionOutputText = "";
                 await runtime.processActions(message, [actionCallMemory], state, async (content) => {
                     actionOutputText += content.text;
-                    if (callback) {
-                        // Optional: stream action updates
-                        // await callback(content); 
-                    }
                     return [];
                 });
 
@@ -238,15 +219,14 @@ export class QuantyMessageService implements IMessageService {
                     actionOutputText = `Action ${action} executed but returned no text.`;
                 }
 
-                // TRUNCATE OUTPUT to prevent context overflow and hanging
+                // Truncate to prevent context overflow
                 const MAX_OUTPUT_LENGTH = 1700;
                 if (actionOutputText.length > MAX_OUTPUT_LENGTH) {
                     actionOutputText = actionOutputText.substring(0, MAX_OUTPUT_LENGTH) + "... [TRUNCATED]";
                 }
 
-                runtime.logger.info(`[Loop] Result (truncated): ${actionOutputText.substring(0, 100)}...`);
+                runtime.logger.info(`[Loop] Action result: ${actionOutputText.substring(0, 100)}...`);
 
-                // Track Results
                 traceActionResult.push({
                     data: { actionName: action },
                     success: true,
@@ -254,18 +234,15 @@ export class QuantyMessageService implements IMessageService {
                 });
                 actionResultStrings.push(`[Action: ${action}]\nResult: ${actionOutputText}`);
 
-                // Continue to next iteration to decide next steps (unless explicitly finished)
                 if (!isFinish) continue;
             }
 
             // 3. Finish & Summarize
             if (isFinish || iterationCount >= MAX_ITERATIONS) {
-                runtime.logger.info("[MultiStep] Finishing and Summarizing.");
+                runtime.logger.info("[MultiStep] Generating final response...");
 
-                // Final State Refresh - skip RECENT_MESSAGES, use frontend history
                 state = await runtime.composeState(message, ['BIO', 'LORE']);
-                state.currentMessage = message.content.text;
-                state.recentMessages = formattedHistory || 'No previous messages.';
+                state.currentMessage = fullMessageText;
                 state.actionResults = actionResultStrings.length > 0
                     ? actionResultStrings.join('\n\n')
                     : "No actions taken.";
@@ -278,7 +255,6 @@ export class QuantyMessageService implements IMessageService {
                 const summaryRaw = await runtime.useModel(ModelType.TEXT_LARGE, { prompt: summaryPrompt });
                 const parsedSummary = parseKeyValueXml(String(summaryRaw));
 
-                // Fallback text extraction
                 let finalText = (parsedSummary?.text as string) || "";
                 if (!finalText) {
                     const match = String(summaryRaw).match(/<text>([\s\S]*?)<\/text>/);
@@ -292,12 +268,10 @@ export class QuantyMessageService implements IMessageService {
                     source: 'quanty'
                 };
 
-                // Send Final Response
                 if (callback) {
                     await callback(finalContent);
                 }
 
-                // Create in-memory representation (no DB save to avoid database dependency)
                 const finalMemory: Memory = {
                     id: createUniqueUuid(runtime, v4()),
                     entityId: runtime.agentId,
@@ -307,8 +281,6 @@ export class QuantyMessageService implements IMessageService {
                     content: finalContent,
                     createdAt: Date.now()
                 };
-                // Skip DB save - history is managed by frontend
-                // await runtime.createMemory(finalMemory, 'messages');
 
                 return {
                     responseContent: finalContent,
@@ -318,7 +290,6 @@ export class QuantyMessageService implements IMessageService {
             }
         }
 
-        // Fallback return
         return {
             responseContent: null,
             responseMessages: [],
@@ -326,25 +297,6 @@ export class QuantyMessageService implements IMessageService {
         };
     }
 
-    /**
-     * Format conversation history from frontend into a string for the prompt.
-     * This allows the agent to see previous messages without requiring a database.
-     */
-    private formatConversationHistory(history: Array<{ role: string; content: string }>): string {
-        if (!history || history.length === 0) {
-            return '';
-        }
-
-        // Limit to last 10 messages to avoid context overflow
-        const recentHistory = history.slice(-10);
-
-        return recentHistory.map(msg => {
-            const speaker = msg.role === 'user' ? 'User' : 'Quanty';
-            return `${speaker}: ${msg.content}`;
-        }).join('\n');
-    }
-
-    // Stubs
     shouldRespond() { return { shouldRespond: true, skipEvaluation: true, reason: 'default' } as ResponseDecision; }
     async processAttachments() { return []; }
     async deleteMessage() { }
