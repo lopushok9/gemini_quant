@@ -32,9 +32,22 @@ const getStockPriceAction: Action = {
   validate: async () => true,
   handler: async (runtime, message, state, options, callback) => {
     try {
-      const originalText = (message.content.text || '').trim();
+      let originalText = (message.content.text || '').trim();
+
+      // Extract only the current message if history context is present
+      const currentMsgMatch = originalText.match(/User's current message:\s*(.+?)$/is);
+      if (currentMsgMatch) {
+        originalText = currentMsgMatch[1].trim();
+      }
+      originalText = originalText.replace(/\[CONVERSATION HISTORY\][\s\S]*?\[END HISTORY\]/gi, '').trim();
+
+      console.log('[GET_STOCK_PRICE] 📝 Cleaned text:', originalText);
+
       const words = originalText.split(/[\s,!?]+/);
-      const blacklist = new Set(['stock', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze', 'equity']);
+      const blacklist = new Set([
+        'stock', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze', 'equity',
+        'history', 'conversation', 'end', 'user', 'current', 'message'
+      ]);
 
       let symbol = words.find(w => w.startsWith('$'))?.substring(1).toUpperCase();
       if (!symbol) {
@@ -97,15 +110,25 @@ const getPriceAction: Action = {
   validate: async () => true,
   handler: async (runtime, message, state, options, callback) => {
     try {
-      const originalText = (message.content.text || '').trim();
+      let originalText = (message.content.text || '').trim();
+
+      // Extract only the current message if history context is present
+      const currentMsgMatch = originalText.match(/User's current message:\s*(.+?)$/is);
+      if (currentMsgMatch) {
+        originalText = currentMsgMatch[1].trim();
+      }
+      // Also strip any [CONVERSATION HISTORY]...[END HISTORY] blocks
+      originalText = originalText.replace(/\[CONVERSATION HISTORY\][\s\S]*?\[END HISTORY\]/gi, '').trim();
+
       const textLow = originalText.toLowerCase();
 
-      console.log('[GET_PRICE] 📝 Original text:', originalText);
+      console.log('[GET_PRICE] 📝 Cleaned text:', originalText);
 
       const blacklist = new Set([
         'price', 'check', 'get', 'what', 'is', 'for', 'the', 'analyze', 'of', 'tell',
         'about', 'now', 'please', 'allow', 'moment', 'data', 'how', 'much',
-        'you', 'can', 'find', 'show', 'give', 'me', 'market', 'crypto', 'asset'
+        'you', 'can', 'find', 'show', 'give', 'me', 'market', 'crypto', 'asset',
+        'history', 'conversation', 'end', 'user', 'current', 'message'
       ]);
 
       const capsMatch = originalText.match(/\b[A-Z]{2,10}\b/g);
@@ -199,9 +222,22 @@ const getMemePriceAction: Action = {
   validate: async () => true,
   handler: async (runtime, message, state, options, callback) => {
     try {
-      const originalText = (message.content.text || '').trim();
+      let originalText = (message.content.text || '').trim();
+
+      // Extract only the current message if history context is present
+      const currentMsgMatch = originalText.match(/User's current message:\s*(.+?)$/is);
+      if (currentMsgMatch) {
+        originalText = currentMsgMatch[1].trim();
+      }
+      originalText = originalText.replace(/\[CONVERSATION HISTORY\][\s\S]*?\[END HISTORY\]/gi, '').trim();
+
+      console.log('[GET_MEME_PRICE] 📝 Cleaned text:', originalText);
+
       const words = originalText.split(/[\s,!?]+/);
-      const blacklist = new Set(['dex', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze']);
+      const blacklist = new Set([
+        'dex', 'price', 'check', 'get', 'what', 'is', 'for', 'the', 'of', 'analyze',
+        'history', 'conversation', 'end', 'user', 'current', 'message'
+      ]);
 
       let symbol = words.find(w => w.startsWith('$'))?.substring(1).toLowerCase();
       if (!symbol) {
