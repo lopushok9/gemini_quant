@@ -151,7 +151,13 @@ export function App() {
         }]);
 
         try {
-            socketManager.sendMessage(agentId, input);
+            // Build conversation history from existing messages (excluding the current one being sent)
+            const conversationHistory = messages.map(m => ({
+                role: m.role,
+                content: m.content
+            }));
+
+            socketManager.sendMessage(agentId, input, conversationHistory);
 
             // Timeout safety
             setTimeout(() => {

@@ -72,7 +72,11 @@ class MessageServiceInstaller extends Service {
                                     ...data,
                                     entityId: data.author_id,
                                     userId: data.author_id,
-                                    content: { text: data.content },
+                                    content: {
+                                        text: data.content,
+                                        // Pass conversation history from frontend (no DB needed)
+                                        conversationHistory: data.conversationHistory || data.metadata?.conversationHistory || []
+                                    },
                                     roomId: data.channel_id || data.roomId
                                 };
 
@@ -82,7 +86,7 @@ class MessageServiceInstaller extends Service {
                                     }
                                     return [];
                                 };
-                                
+
                                 await myMessageService.handleMessage(runtime, mappedMessage as any, responseCallback);
                             }
                         } catch (err) {

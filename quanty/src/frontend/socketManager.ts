@@ -65,7 +65,7 @@ class SocketManager {
         });
     }
 
-    sendMessage(agentId: string, text: string) {
+    sendMessage(agentId: string, text: string, conversationHistory?: Array<{ role: string; content: string }>) {
         if (!this.socket) {
             console.error('Cannot send message: Socket not connected');
             return;
@@ -77,7 +77,9 @@ class SocketManager {
             message: text, // ElizaOS 1.7.0 expects 'message'
             channelId: agentId,
             messageServerId: '00000000-0000-0000-0000-000000000000',
-            source: 'direct'
+            source: 'direct',
+            // Include conversation history for context (no DB needed)
+            conversationHistory: conversationHistory || []
         };
 
         console.log('📤 Emitting SEND_MESSAGE to socket:', payload);

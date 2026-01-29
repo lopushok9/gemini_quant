@@ -121,16 +121,21 @@ export class QuantyMessageService implements IMessageService {
             callback?: HandlerCallback,
             options?: MessageProcessingOptions
         ): Promise<MessageProcessingResult> {
-            
+
             runtime.logger.info(`[QuantyMessageService] handleMessage INVOCATION from ${message.entityId} in room ${message.roomId}`);
             runtime.logger.info(`[QuantyMessageService] Message text: ${message.content.text?.substring(0, 50)}`);
-        // 1. Ensure Message ID
+
+        // 1. Ensure Message ID (in-memory only, no DB)
         if (!message.id) {
-            message.id = await runtime.createMemory(message, 'messages') as UUID;
+            message.id = createUniqueUuid(runtime, v4());
         }
 
-        // 2. Run Multi-Step Core
-        const result = await this.runMultiStepCore(runtime, message, callback);
+        // 2. Extract conversation history from message content (passed from frontend)
+        const conversationHistory = (message.content as any).conversationHistory || [];
+        runtime.logger.info(`[QuantyMessageService] Received ${conversationHistory.length} messages in history`);
+
+        // 3. Run Multi-Step Core with conversation history
+        const result = await this.runMultiStepCore(runtime, message, callback, conversationHistory);
 
         return {
             didRespond: true,
@@ -144,7 +149,8 @@ export class QuantyMessageService implements IMessageService {
     private async runMultiStepCore(
         runtime: IAgentRuntime,
         message: Memory,
-        callback?: HandlerCallback
+        callback?: HandlerCallback,
+        conversationHistory: Array<{ role: string; content: string }> = []
     ): Promise<{ responseContent: Content | null, responseMessages: Memory[], state: State }> {
 
         const MAX_ITERATIONS = 5;
@@ -152,18 +158,24 @@ export class QuantyMessageService implements IMessageService {
         const traceActionResult: MultiStepActionResult[] = [];
         const actionResultStrings: string[] = []; // For template injection
 
-        // Initial State
-        let state = await runtime.composeState(message, ['RECENT_MESSAGES', 'BIO', 'LORE']);
-        // FORCE inject the current message text to ensure visibility
+        // Format conversation history for the prompt (from frontend, no DB needed)
+        const formattedHistory = this.formatConversationHistory(conversationHistory);
+        runtime.logger.info(`[QuantyMessageService] Formatted history: ${formattedHistory.substring(0, 200)}...`);
+
+        // Initial State - use BIO and LORE only, skip RECENT_MESSAGES (we have history from frontend)
+        let state = await runtime.composeState(message, ['BIO', 'LORE']);
+        // FORCE inject the current message text and conversation history
         state.currentMessage = message.content.text;
+        state.recentMessages = formattedHistory || 'No previous messages.';
 
         while (iterationCount < MAX_ITERATIONS) {
             iterationCount++;
             runtime.logger.info(`[MultiStep] Iteration ${iterationCount}/${MAX_ITERATIONS}`);
 
-            // Refresh State
-            state = await runtime.composeState(message, ['RECENT_MESSAGES', 'BIO', 'LORE']);
+            // Refresh State - skip RECENT_MESSAGES, use frontend history instead
+            state = await runtime.composeState(message, ['BIO', 'LORE']);
             state.currentMessage = message.content.text; // Persist across loops
+            state.recentMessages = formattedHistory || 'No previous messages.'; // Use frontend history
             state.iterationCount = String(iterationCount);
             state.maxIterations = String(MAX_ITERATIONS);
             state.traceActionResultLength = String(traceActionResult.length);
@@ -250,9 +262,10 @@ export class QuantyMessageService implements IMessageService {
             if (isFinish || iterationCount >= MAX_ITERATIONS) {
                 runtime.logger.info("[MultiStep] Finishing and Summarizing.");
 
-                // Final State Refresh
-                state = await runtime.composeState(message);
+                // Final State Refresh - skip RECENT_MESSAGES, use frontend history
+                state = await runtime.composeState(message, ['BIO', 'LORE']);
                 state.currentMessage = message.content.text;
+                state.recentMessages = formattedHistory || 'No previous messages.';
                 state.actionResults = actionResultStrings.length > 0
                     ? actionResultStrings.join('\n\n')
                     : "No actions taken.";
@@ -284,7 +297,7 @@ export class QuantyMessageService implements IMessageService {
                     await callback(finalContent);
                 }
 
-                // Create Memory
+                // Create in-memory representation (no DB save to avoid database dependency)
                 const finalMemory: Memory = {
                     id: createUniqueUuid(runtime, v4()),
                     entityId: runtime.agentId,
@@ -294,7 +307,8 @@ export class QuantyMessageService implements IMessageService {
                     content: finalContent,
                     createdAt: Date.now()
                 };
-                await runtime.createMemory(finalMemory, 'messages');
+                // Skip DB save - history is managed by frontend
+                // await runtime.createMemory(finalMemory, 'messages');
 
                 return {
                     responseContent: finalContent,
@@ -310,6 +324,24 @@ export class QuantyMessageService implements IMessageService {
             responseMessages: [],
             state
         };
+    }
+
+    /**
+     * Format conversation history from frontend into a string for the prompt.
+     * This allows the agent to see previous messages without requiring a database.
+     */
+    private formatConversationHistory(history: Array<{ role: string; content: string }>): string {
+        if (!history || history.length === 0) {
+            return '';
+        }
+
+        // Limit to last 10 messages to avoid context overflow
+        const recentHistory = history.slice(-10);
+
+        return recentHistory.map(msg => {
+            const speaker = msg.role === 'user' ? 'User' : 'Quanty';
+            return `${speaker}: ${msg.content}`;
+        }).join('\n');
     }
 
     // Stubs
