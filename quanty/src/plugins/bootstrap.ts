@@ -66,6 +66,13 @@ class MessageServiceInstaller extends Service {
 
                         try {
                             if (data && data.content && data.author_id !== runtime.agentId) {
+                                // Extract conversation history from metadata
+                                const history = data.metadata?.conversationHistory
+                                    || data.raw_message?.metadata?.conversationHistory
+                                    || [];
+
+                                console.log('[QuantyPlugin] 📜 History from metadata:', history.length, 'messages');
+
                                 const mappedMessage = {
                                     id: data.id || crypto.randomUUID(),
                                     entityId: data.author_id,
@@ -73,7 +80,9 @@ class MessageServiceInstaller extends Service {
                                     roomId: data.channel_id || data.roomId,
                                     worldId: data.server_id || runtime.agentId,
                                     content: {
-                                        text: data.content
+                                        text: data.content,
+                                        // Pass history separately for LLM prompts
+                                        conversationHistory: history
                                     },
                                     createdAt: data.created_at || Date.now()
                                 };
@@ -92,9 +101,6 @@ class MessageServiceInstaller extends Service {
                         }
 
                         // Don't call original to avoid double processing
-                        // if (typeof originalHandle === 'function') {
-                        //     return originalHandle.call(busService, data);
-                        // }
                     };
 
                     runtime.logger.success('[QuantyPlugin] ✅ MessageBusService patched');

@@ -24,7 +24,10 @@ Determine the next step the assistant should take in this conversation to help t
 {{bio}}
 
 <context>
-# USER MESSAGE
+# CONVERSATION HISTORY
+{{conversationHistory}}
+
+# CURRENT USER MESSAGE
 {{currentMessage}}
 
 # EXECUTION STATE
@@ -38,7 +41,7 @@ Determine the next step the assistant should take in this conversation to help t
 
 <instructions>
 # Decision Process
-1. **Analyze**: What is the user asking for?
+1. **Analyze**: What is the user asking for in CURRENT USER MESSAGE?
 2. **Check History**: Have I already executed actions for this specific request in "action_history"?
 3. **Select Action**:
    - If I need data (Price, News, On-chain) -> Choose ONE action (GET_PRICE, GET_STOCK_PRICE, etc).
@@ -70,7 +73,10 @@ Generate a final, user-facing response based on the results obtained.
 {{bio}}
 
 <context>
-# USER MESSAGE
+# CONVERSATION HISTORY
+{{conversationHistory}}
+
+# CURRENT USER MESSAGE
 {{currentMessage}}
 
 # DATA GATHERED
@@ -147,12 +153,19 @@ export class QuantyMessageService implements IMessageService {
         const traceActionResult: MultiStepActionResult[] = [];
         const actionResultStrings: string[] = [];
 
-        // Get the full message text (may include conversation history context)
-        const fullMessageText = message.content.text || '';
+        // Get clean message text (without history)
+        const currentMessageText = message.content.text || '';
+
+        // Format conversation history for LLM prompts
+        const history = (message.content as any).conversationHistory || [];
+        const formattedHistory = this.formatConversationHistory(history);
+
+        runtime.logger.info(`[QuantyMessageService] Message: "${currentMessageText.substring(0, 50)}", History: ${history.length} msgs`);
 
         // Initial State
         let state = await runtime.composeState(message, ['BIO', 'LORE']);
-        state.currentMessage = fullMessageText;
+        state.currentMessage = currentMessageText;
+        state.conversationHistory = formattedHistory || 'No previous messages.';
 
         while (iterationCount < MAX_ITERATIONS) {
             iterationCount++;
@@ -160,7 +173,8 @@ export class QuantyMessageService implements IMessageService {
 
             // Refresh State
             state = await runtime.composeState(message, ['BIO', 'LORE']);
-            state.currentMessage = fullMessageText;
+            state.currentMessage = currentMessageText;
+            state.conversationHistory = formattedHistory || 'No previous messages.';
             state.iterationCount = String(iterationCount);
             state.maxIterations = String(MAX_ITERATIONS);
             state.traceActionResultLength = String(traceActionResult.length);
@@ -242,7 +256,8 @@ export class QuantyMessageService implements IMessageService {
                 runtime.logger.info("[MultiStep] Generating final response...");
 
                 state = await runtime.composeState(message, ['BIO', 'LORE']);
-                state.currentMessage = fullMessageText;
+                state.currentMessage = currentMessageText;
+                state.conversationHistory = formattedHistory || 'No previous messages.';
                 state.actionResults = actionResultStrings.length > 0
                     ? actionResultStrings.join('\n\n')
                     : "No actions taken.";
@@ -295,6 +310,22 @@ export class QuantyMessageService implements IMessageService {
             responseMessages: [],
             state
         };
+    }
+
+    /**
+     * Format conversation history for LLM prompts
+     */
+    private formatConversationHistory(history: Array<{ role: string; content: string }>): string {
+        if (!history || history.length === 0) {
+            return '';
+        }
+
+        return history.map(msg => {
+            const speaker = msg.role === 'user' ? 'User' : 'Quanty';
+            // Truncate long messages to avoid context overflow
+            const content = msg.content.length > 200 ? msg.content.substring(0, 200) + '...' : msg.content;
+            return `${speaker}: ${content}`;
+        }).join('\n');
     }
 
     shouldRespond() { return { shouldRespond: true, skipEvaluation: true, reason: 'default' } as ResponseDecision; }

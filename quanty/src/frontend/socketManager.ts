@@ -73,26 +73,22 @@ class SocketManager {
 
         const history = conversationHistory || [];
 
-        // Format history as a single string to include in the message text
-        // This is the simplest approach - append history context to the message itself
-        let messageWithContext = text;
-        if (history.length > 0) {
-            const historyText = history.slice(-6).map(m =>
-                `${m.role === 'user' ? 'User' : 'Quanty'}: ${m.content}`
-            ).join('\n');
-            messageWithContext = `[CONVERSATION HISTORY]\n${historyText}\n[END HISTORY]\n\nUser's current message: ${text}`;
-        }
-
+        // Send clean message text - history is passed separately in metadata
+        // This prevents history from breaking actions that parse the message text
         const payload = {
             senderId: this.userId,
             senderName: 'Investor',
-            message: messageWithContext,
+            message: text,  // Clean message without history
             channelId: agentId,
             messageServerId: '00000000-0000-0000-0000-000000000000',
-            source: 'direct'
+            source: 'direct',
+            // Pass history in metadata - will be used by LLM prompts only
+            metadata: {
+                conversationHistory: history.slice(-6)  // Last 6 messages
+            }
         };
 
-        console.log('📤 Emitting SEND_MESSAGE with history context, history length:', history.length);
+        console.log('📤 Emitting SEND_MESSAGE, history in metadata, length:', history.length);
 
         this.socket.emit('message', {
             type: SOCKET_MESSAGE_TYPE.SEND_MESSAGE,
