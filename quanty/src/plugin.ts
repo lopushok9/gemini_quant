@@ -100,6 +100,8 @@ const getPriceAction: Action = {
       const originalText = (message.content.text || '').trim();
       const textLow = originalText.toLowerCase();
 
+      console.log('[GET_PRICE] 📝 Original text:', originalText);
+
       const blacklist = new Set([
         'price', 'check', 'get', 'what', 'is', 'for', 'the', 'analyze', 'of', 'tell',
         'about', 'now', 'please', 'allow', 'moment', 'data', 'how', 'much',
@@ -108,6 +110,8 @@ const getPriceAction: Action = {
 
       const capsMatch = originalText.match(/\b[A-Z]{2,10}\b/g);
       const dollarMatch = originalText.match(/\$[a-zA-Z]{2,10}/g);
+
+      console.log('[GET_PRICE] 🔍 capsMatch:', capsMatch, 'dollarMatch:', dollarMatch);
 
       let symbol = '';
       if (dollarMatch) {
@@ -122,6 +126,8 @@ const getPriceAction: Action = {
         symbol = words.find(w => w.length >= 2 && w.length <= 10 && !blacklist.has(w)) || '';
       }
 
+      console.log('[GET_PRICE] 🎯 Parsed symbol:', symbol);
+
       if (!symbol) {
         if (callback) await callback({ text: "I couldn't identify the ticker clearly. Please specify it (e.g. BTC)." });
         return { text: 'Missing symbol', success: false };
@@ -134,9 +140,13 @@ const getPriceAction: Action = {
       };
 
       let coinId = majorCoins[symbol];
+      console.log('[GET_PRICE] 🪙 coinId from majorCoins:', coinId);
+
       if (!coinId) {
+        console.log('[GET_PRICE] 🔎 Searching CoinGecko for:', symbol);
         const searchRes = await fetch(`https://api.coingecko.com/api/v3/search?query=${symbol}`);
         const searchData = (await searchRes.json()) as any;
+        console.log('[GET_PRICE] 🔎 Search results:', searchData.coins?.slice(0, 3));
         const exactMatch = searchData.coins?.find((c: any) => c.symbol.toLowerCase() === symbol);
         const coin = exactMatch || searchData.coins?.[0];
         if (!coin) {
@@ -144,18 +154,30 @@ const getPriceAction: Action = {
           return { text: 'Not found', success: false };
         }
         coinId = coin.id;
+        console.log('[GET_PRICE] 🪙 coinId from search:', coinId);
       }
 
-      const priceRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`);
+      const priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`;
+      console.log('[GET_PRICE] 📡 Fetching price from:', priceUrl);
+
+      const priceRes = await fetch(priceUrl);
       const priceData = (await priceRes.json()) as any;
+      console.log('[GET_PRICE] 💰 Price data:', JSON.stringify(priceData));
+
       const data = priceData[coinId];
 
-      if (!data) return { text: 'Fetch failed', success: false };
+      if (!data) {
+        console.log('[GET_PRICE] ❌ No data for coinId:', coinId);
+        return { text: 'Fetch failed', success: false };
+      }
 
       const responseText = `[DATA FETCHED]: ${coinId.toUpperCase()} | PRICE: $${data.usd.toLocaleString()} | 24h: ${data.usd_24h_change?.toFixed(2)}% | MCAP: $${(data.usd_market_cap || 0).toLocaleString()}`;
+      console.log('[GET_PRICE] ✅ Response:', responseText);
+
       if (callback) await callback({ text: responseText, source: message.content.source });
       return { text: `Success: ${coinId}`, data: { ...data, symbol, id: coinId }, success: true };
     } catch (error) {
+      console.error('[GET_PRICE] ❌ Error:', error);
       return { text: 'Error', success: false };
     }
   },
