@@ -189,11 +189,33 @@ export class QuantyMessageService implements IMessageService {
             });
 
             const responseRaw = await runtime.useModel(ModelType.TEXT_LARGE, { prompt });
-            const parsed = parseKeyValueXml(String(responseRaw));
+            const responseStr = String(responseRaw);
+
+            runtime.logger.info(`[MultiStep] LLM Response (first 500 chars): ${responseStr.substring(0, 500)}`);
+
+            // Try to extract XML manually if parseKeyValueXml fails
+            let parsed = parseKeyValueXml(responseStr);
 
             if (!parsed) {
-                runtime.logger.warn("[MultiStep] Failed to parse XML decision. Aborting.");
-                break;
+                // Try manual extraction
+                const thoughtMatch = responseStr.match(/<thought>([\s\S]*?)<\/thought>/);
+                const actionMatch = responseStr.match(/<action>([\s\S]*?)<\/action>/);
+                const isFinishMatch = responseStr.match(/<isFinish>([\s\S]*?)<\/isFinish>/);
+
+                if (thoughtMatch || actionMatch || isFinishMatch) {
+                    parsed = {
+                        thought: thoughtMatch?.[1]?.trim() || '',
+                        action: actionMatch?.[1]?.trim() || '',
+                        isFinish: isFinishMatch?.[1]?.trim() || 'false'
+                    };
+                    runtime.logger.info("[MultiStep] Manually extracted XML fields");
+                }
+            }
+
+            if (!parsed) {
+                runtime.logger.warn("[MultiStep] Failed to parse XML decision. Raw response logged above.");
+                // Try to continue with defaults instead of aborting
+                parsed = { thought: 'Parse failed', action: '', isFinish: 'true' };
             }
 
             const thought = (parsed.thought as string) || "";
