@@ -156,51 +156,35 @@ const getPriceAction: Action = {
         return { text: 'Missing symbol', success: false };
       }
 
-      const majorCoins: Record<string, string> = {
-        'btc': 'bitcoin', 'eth': 'ethereum', 'sol': 'solana', 'bnb': 'binancecoin',
-        'xrp': 'ripple', 'ada': 'cardano', 'doge': 'dogecoin', 'dot': 'polkadot',
-        'pepe': 'pepe', 'link': 'chainlink', 'trx': 'tron', 'ton': 'the-open-network', 'shib': 'shiba-inu'
-      };
+      // Use CoinCap API (free, no rate limits issues)
+      const coinCapUrl = `https://api.coincap.io/v2/assets?search=${symbol}&limit=5`;
+      console.log('[GET_PRICE] 📡 Fetching from CoinCap:', coinCapUrl);
 
-      let coinId = majorCoins[symbol];
-      console.log('[GET_PRICE] 🪙 coinId from majorCoins:', coinId);
+      const searchRes = await fetch(coinCapUrl);
+      const searchData = (await searchRes.json()) as any;
 
-      if (!coinId) {
-        console.log('[GET_PRICE] 🔎 Searching CoinGecko for:', symbol);
-        const searchRes = await fetch(`https://api.coingecko.com/api/v3/search?query=${symbol}`);
-        const searchData = (await searchRes.json()) as any;
-        console.log('[GET_PRICE] 🔎 Search results:', searchData.coins?.slice(0, 3));
-        const exactMatch = searchData.coins?.find((c: any) => c.symbol.toLowerCase() === symbol);
-        const coin = exactMatch || searchData.coins?.[0];
-        if (!coin) {
-          if (callback) await callback({ text: `Asset '${symbol}' not found.` });
-          return { text: 'Not found', success: false };
-        }
-        coinId = coin.id;
-        console.log('[GET_PRICE] 🪙 coinId from search:', coinId);
+      if (!searchData.data || searchData.data.length === 0) {
+        if (callback) await callback({ text: `Asset '${symbol.toUpperCase()}' not found.` });
+        return { text: 'Not found', success: false };
       }
 
-      const priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`;
-      console.log('[GET_PRICE] 📡 Fetching price from:', priceUrl);
+      // Find exact match or use first result
+      const coin = searchData.data.find((c: any) => c.symbol.toLowerCase() === symbol) || searchData.data[0];
 
-      const priceRes = await fetch(priceUrl);
-      const priceData = (await priceRes.json()) as any;
-      console.log('[GET_PRICE] 💰 Price data:', JSON.stringify(priceData));
+      const price = parseFloat(coin.priceUsd);
+      const change24h = parseFloat(coin.changePercent24Hr);
+      const marketCap = parseFloat(coin.marketCapUsd);
 
-      const data = priceData[coinId];
+      console.log('[GET_PRICE] 💰 Found:', coin.name, 'Price:', price);
 
-      if (!data) {
-        console.log('[GET_PRICE] ❌ No data for coinId:', coinId);
-        return { text: 'Fetch failed', success: false };
-      }
-
-      const responseText = `[DATA FETCHED]: ${coinId.toUpperCase()} | PRICE: $${data.usd.toLocaleString()} | 24h: ${data.usd_24h_change?.toFixed(2)}% | MCAP: $${(data.usd_market_cap || 0).toLocaleString()}`;
+      const responseText = `[DATA FETCHED]: ${coin.symbol} (${coin.name}) | PRICE: $${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} | 24h: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% | MCAP: $${(marketCap / 1e9).toFixed(2)}B`;
       console.log('[GET_PRICE] ✅ Response:', responseText);
 
       if (callback) await callback({ text: responseText, source: message.content.source });
-      return { text: `Success: ${coinId}`, data: { ...data, symbol, id: coinId }, success: true };
+      return { text: `Success: ${coin.symbol}`, data: { price, change24h, marketCap, symbol: coin.symbol, name: coin.name }, success: true };
     } catch (error) {
       console.error('[GET_PRICE] ❌ Error:', error);
+      if (callback) await callback({ text: "Error fetching price data. Please try again." });
       return { text: 'Error', success: false };
     }
   },
