@@ -44,26 +44,38 @@ Determine the next step the assistant should take in this conversation to help t
 1. **Analyze**: What is the user asking for in CURRENT USER MESSAGE?
 2. **Check History**: Have I already executed actions for this specific request in "action_history"?
 3. **Select Action**:
-   - If I need data (Price, News, On-chain) -> Choose ONE action (GET_PRICE, GET_STOCK_PRICE, etc).
+   - If I need crypto price -> GET_PRICE
+   - If I need stock price -> GET_STOCK_PRICE
+   - If I need meme/DEX data -> GET_MEME_PRICE
+   - If I need news/research/web info -> WEB_SEARCH (MUST provide query parameter!)
    - If I have the data -> Set isFinish: true.
    - If it's just chat -> Set isFinish: true.
+
+# Available Actions & Parameters
+- **GET_PRICE**: No parameters needed (extracts symbol from context)
+- **GET_STOCK_PRICE**: No parameters needed (extracts symbol from context)
+- **GET_MEME_PRICE**: No parameters needed (extracts symbol from context)
+- **WEB_SEARCH**: REQUIRES parameters: { "query": "search terms here", "topic": "general" or "finance" }
 
 # Rules
 - **ONE ACTION** per step.
 - **DO NOT** repeat the exact same action.
 - **MANDATORY**: If the user asks for "Price of BTC", you MUST execute "GET_PRICE" before finishing.
+- **MANDATORY**: For WEB_SEARCH, ALWAYS include the "query" parameter with specific search terms!
 </instructions>
 
 <output>
 Respond with XML:
 <response>
   <thought>Explain why you are taking this action or finishing.</thought>
-  <action>ACTION_NAME (e.g. GET_PRICE) or empty if finishing</action>
-  <parameters>
-    { "param": "value" }
-  </parameters>
+  <action>ACTION_NAME (e.g. GET_PRICE, WEB_SEARCH) or empty if finishing</action>
+  <parameters>{"query": "your search query", "topic": "finance"}</parameters>
   <isFinish>true | false</isFinish>
 </response>
+
+Examples:
+- For WEB_SEARCH: <action>WEB_SEARCH</action><parameters>{"query": "Solana latest news developments", "topic": "finance"}</parameters>
+- For GET_PRICE: <action>GET_PRICE</action><parameters>{}</parameters>
 </output>`;
 
 const multiStepSummaryTemplate = `<task>
@@ -200,12 +212,28 @@ export class QuantyMessageService implements IMessageService {
                 // Try manual extraction
                 const thoughtMatch = responseStr.match(/<thought>([\s\S]*?)<\/thought>/);
                 const actionMatch = responseStr.match(/<action>([\s\S]*?)<\/action>/);
+                const parametersMatch = responseStr.match(/<parameters>([\s\S]*?)<\/parameters>/);
                 const isFinishMatch = responseStr.match(/<isFinish>([\s\S]*?)<\/isFinish>/);
 
                 if (thoughtMatch || actionMatch || isFinishMatch) {
+                    // Parse parameters JSON if present
+                    let parameters = {};
+                    if (parametersMatch && parametersMatch[1]) {
+                        try {
+                            const paramStr = parametersMatch[1].trim();
+                            if (paramStr && paramStr !== '{}') {
+                                parameters = JSON.parse(paramStr);
+                                runtime.logger.info(`[MultiStep] Parsed parameters: ${JSON.stringify(parameters)}`);
+                            }
+                        } catch (e) {
+                            runtime.logger.warn(`[MultiStep] Failed to parse parameters JSON: ${parametersMatch[1]}`);
+                        }
+                    }
+
                     parsed = {
                         thought: thoughtMatch?.[1]?.trim() || '',
                         action: actionMatch?.[1]?.trim() || '',
+                        parameters: parameters,
                         isFinish: isFinishMatch?.[1]?.trim() || 'false'
                     };
                     runtime.logger.info("[MultiStep] Manually extracted XML fields");
@@ -220,14 +248,26 @@ export class QuantyMessageService implements IMessageService {
 
             const thought = (parsed.thought as string) || "";
             const action = (parsed.action as string) || "";
+            const actionParams = (parsed.parameters as Record<string, any>) || {};
             const isFinish = String(parsed.isFinish).toLowerCase() === 'true';
 
             runtime.logger.info(`[Loop] Thought: ${thought}`);
-            runtime.logger.info(`[Loop] Action: '${action}' | Finish: ${isFinish}`);
+            runtime.logger.info(`[Loop] Action: '${action}' | Params: ${JSON.stringify(actionParams)} | Finish: ${isFinish}`);
 
             // 2. Execute Action
             if (action && action.toUpperCase() !== 'NONE' && action !== '') {
                 runtime.logger.info(`[Loop] Executing: ${action}`);
+
+                // Set actionParams in state.data for the action to read
+                if (!state.data) state.data = {};
+                state.data.actionParams = actionParams;
+
+                // For WEB_SEARCH, use query as message text (fallback mechanism)
+                let actionMessageText = `Executing action: ${action}`;
+                if (action === 'WEB_SEARCH' && actionParams.query) {
+                    actionMessageText = actionParams.query;
+                    runtime.logger.info(`[Loop] WEB_SEARCH query: ${actionParams.query}`);
+                }
 
                 const actionCallMemory: Memory = {
                     id: createUniqueUuid(runtime, v4()),
@@ -236,10 +276,11 @@ export class QuantyMessageService implements IMessageService {
                     roomId: message.roomId,
                     worldId: message.worldId,
                     content: {
-                        text: `Executing action: ${action}`,
+                        text: actionMessageText,
                         action: action,
                         actions: [action],
                         thought: thought,
+                        actionParams: actionParams, // Also pass in content for backup
                         source: 'quanty'
                     },
                     createdAt: Date.now(),
