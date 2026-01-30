@@ -18,21 +18,17 @@ import {
 
 
 const multiStepDecisionTemplate = `<task>
-Determine the next step the assistant should take in this conversation to help the user reach their goal.
+Determine the next step. Be EFFICIENT - finish as quickly as possible.
 </task>
 
 {{bio}}
 
 <context>
-# CONVERSATION HISTORY
-{{conversationHistory}}
-
 # CURRENT USER MESSAGE
 {{currentMessage}}
 
 # EXECUTION STATE
-**Current Step**: {{iterationCount}} of {{maxIterations}}
-**Actions Taken This Round**: {{traceActionResultLength}}
+**Step**: {{iterationCount}} of {{maxIterations}} | **Actions Done**: {{traceActionResultLength}}
 </context>
 
 <action_history>
@@ -40,42 +36,44 @@ Determine the next step the assistant should take in this conversation to help t
 </action_history>
 
 <instructions>
-# Decision Process
-1. **Analyze**: What is the user asking for in CURRENT USER MESSAGE?
-2. **Check History**: Have I already executed actions for this specific request in "action_history"?
-3. **Select Action**:
-   - If I need crypto price -> GET_PRICE
-   - If I need stock price -> GET_STOCK_PRICE
-   - If I need meme/DEX data -> GET_MEME_PRICE
-   - If I need news/research/web info -> WEB_SEARCH (MUST provide query parameter!)
-   - If I have the data -> Set isFinish: true.
-   - If it's just chat -> Set isFinish: true.
+# CRITICAL: Request Classification
+First, classify the request:
+- **SIMPLE** (price check, greeting, simple question) → MAX 1 action, then finish
+- **RESEARCH** (news, analysis) → MAX 1-2 actions, then finish
 
-# Available Actions & Parameters
-- **GET_PRICE**: No parameters needed (extracts symbol from context)
-- **GET_STOCK_PRICE**: No parameters needed (extracts symbol from context)
-- **GET_MEME_PRICE**: No parameters needed (extracts symbol from context)
-- **WEB_SEARCH**: REQUIRES parameters: { "query": "search terms here", "topic": "general" or "finance" }
+# Decision Flow
+1. Is this just a greeting or chat? → isFinish: true (NO action needed)
+2. Did I already execute an action for this request? → isFinish: true
+3. Do I need data? → Execute ONE action, then set isFinish: true
 
-# Rules
-- **ONE ACTION** per step.
-- **DO NOT** repeat the exact same action.
-- **MANDATORY**: If the user asks for "Price of BTC", you MUST execute "GET_PRICE" before finishing.
-- **MANDATORY**: For WEB_SEARCH, ALWAYS include the "query" parameter with specific search terms!
+# Available Actions
+- **GET_PRICE**: Crypto price (BTC, ETH, SOL, etc.)
+- **GET_STOCK_PRICE**: Stock price (NVDA, AAPL, etc.)
+- **GET_MEME_PRICE**: Meme coin / DEX data
+- **WEB_SEARCH**: News/research. REQUIRES: {"query": "search terms", "topic": "finance"}
+
+# STRICT RULES
+1. **ONE action per request** - After executing an action, SET isFinish: true
+2. **NEVER repeat** the same action twice
+3. **NEVER loop** - If action_history has ANY results, set isFinish: true
+4. **Conversation = isFinish: true** - Greetings, thanks, questions about yourself → finish immediately
+5. **WEB_SEARCH needs query** - Always provide {"query": "...", "topic": "finance"}
+
+# WHEN TO SET isFinish: true
+- ✅ After ANY action completes (success or failure)
+- ✅ If action_history is NOT empty
+- ✅ If user is just chatting (no data request)
+- ✅ If you already have the data needed
+- ✅ If step > 1
 </instructions>
 
 <output>
-Respond with XML:
 <response>
-  <thought>Explain why you are taking this action or finishing.</thought>
-  <action>ACTION_NAME (e.g. GET_PRICE, WEB_SEARCH) or empty if finishing</action>
-  <parameters>{"query": "your search query", "topic": "finance"}</parameters>
-  <isFinish>true | false</isFinish>
+  <thought>Step {{iterationCount}}: [Brief reasoning - max 1 sentence]</thought>
+  <action>ACTION_NAME or empty string</action>
+  <parameters>{}</parameters>
+  <isFinish>true or false</isFinish>
 </response>
-
-Examples:
-- For WEB_SEARCH: <action>WEB_SEARCH</action><parameters>{"query": "Solana latest news developments", "topic": "finance"}</parameters>
-- For GET_PRICE: <action>GET_PRICE</action><parameters>{}</parameters>
 </output>`;
 
 const multiStepSummaryTemplate = `<task>
@@ -160,7 +158,7 @@ export class QuantyMessageService implements IMessageService {
         callback?: HandlerCallback
     ): Promise<{ responseContent: Content | null, responseMessages: Memory[], state: State }> {
 
-        const MAX_ITERATIONS = 5;
+        const MAX_ITERATIONS = 3; // Reduced to prevent loops - most tasks need 1-2 iterations
         let iterationCount = 0;
         const traceActionResult: MultiStepActionResult[] = [];
         const actionResultStrings: string[] = [];
@@ -182,6 +180,12 @@ export class QuantyMessageService implements IMessageService {
         while (iterationCount < MAX_ITERATIONS) {
             iterationCount++;
             runtime.logger.info(`[MultiStep] Iteration ${iterationCount}/${MAX_ITERATIONS}`);
+
+            // FORCE FINISH: If we already have action results, skip to summary
+            if (traceActionResult.length > 0 && iterationCount > 1) {
+                runtime.logger.info(`[MultiStep] Force finishing - already have ${traceActionResult.length} action results`);
+                break; // Exit loop to generate summary
+            }
 
             // Refresh State
             state = await runtime.composeState(message, ['BIO', 'LORE']);
@@ -366,6 +370,59 @@ export class QuantyMessageService implements IMessageService {
                     state
                 };
             }
+        }
+
+        // Generate summary after loop exits (either by break or max iterations)
+        if (traceActionResult.length > 0 || actionResultStrings.length > 0) {
+            runtime.logger.info("[MultiStep] Generating final response after loop...");
+
+            state = await runtime.composeState(message, ['BIO', 'LORE']);
+            state.currentMessage = currentMessageText;
+            state.conversationHistory = formattedHistory || 'No previous messages.';
+            state.actionResults = actionResultStrings.length > 0
+                ? actionResultStrings.join('\n\n')
+                : "No actions taken.";
+
+            const summaryPrompt = composePromptFromState({
+                state,
+                template: multiStepSummaryTemplate
+            });
+
+            const summaryRaw = await runtime.useModel(ModelType.TEXT_LARGE, { prompt: summaryPrompt });
+            const parsedSummary = parseKeyValueXml(String(summaryRaw));
+
+            let finalText = (parsedSummary?.text as string) || "";
+            if (!finalText) {
+                const match = String(summaryRaw).match(/<text>([\s\S]*?)<\/text>/);
+                finalText = match ? match[1] : String(summaryRaw);
+            }
+
+            const finalContent: Content = {
+                text: finalText,
+                thought: (parsedSummary?.thought as string) || "Summary generated.",
+                actions: [],
+                source: 'quanty'
+            };
+
+            if (callback) {
+                await callback(finalContent);
+            }
+
+            const finalMemory: Memory = {
+                id: createUniqueUuid(runtime, v4()),
+                entityId: runtime.agentId,
+                agentId: runtime.agentId,
+                roomId: message.roomId,
+                worldId: message.worldId,
+                content: finalContent,
+                createdAt: Date.now()
+            };
+
+            return {
+                responseContent: finalContent,
+                responseMessages: [finalMemory],
+                state
+            };
         }
 
         return {
